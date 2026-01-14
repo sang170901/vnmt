@@ -202,7 +202,7 @@ $categories = $newsManager->getCategories();
     .stat-number { font-size: 1.1rem; font-weight:700; color: var(--primary-600); }
 
     /* Responsive adjustments */
-    @media (max-width: 900px) {
+    @media (max-width: 1200px) {
         .content-grid { grid-template-columns: 1fr; }
         .article-card { flex-direction: column; }
         .article-image { width: 100%; height: 180px; min-width: auto; }
@@ -455,7 +455,7 @@ $categories = $newsManager->getCategories();
                     </div>
                     <div class="recent-content">
                         <div class="recent-title">
-                            <a href="article-detail.php?slug=<?php echo $recent['slug']; ?>">
+                            <a href="<?php echo buildLangUrl('article-detail'); ?>?slug=<?php echo $recent['slug']; ?>">
                                 <?php echo htmlspecialchars($recent['title']); ?>
                             </a>
                         </div>

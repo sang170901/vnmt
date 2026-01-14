@@ -33,6 +33,22 @@
         <span class="nav-icon"><i class="fas fa-box"></i></span>
         <span class="nav-text">Sản phẩm</span>
       </a>
+  <a href="import_csv.php" class="nav-item <?php echo (strpos($request, 'import_csv.php') !== false) ? 'active' : '' ?>">
+        <span class="nav-icon"><i class="fas fa-file-csv"></i></span>
+        <span class="nav-text">Nhập CSV</span>
+      </a>
+  <a href="categories.php" class="nav-item <?php echo (strpos($request, 'categories.php') !== false) ? 'active' : '' ?>">
+        <span class="nav-icon"><i class="fas fa-folder-tree"></i></span>
+        <span class="nav-text">Danh mục</span>
+      </a>
+  <a href="posts.php" class="nav-item <?php echo (strpos($request, 'posts.php') !== false || strpos($request, 'post_form.php') !== false) ? 'active' : '' ?>">
+        <span class="nav-icon"><i class="fas fa-newspaper"></i></span>
+        <span class="nav-text">Bài viết</span>
+      </a>
+  <a href="comments.php" class="nav-item <?php echo (strpos($request, 'comments.php') !== false) ? 'active' : '' ?>">
+        <span class="nav-icon"><i class="fas fa-comments"></i></span>
+        <span class="nav-text">Bình luận</span>
+      </a>
   <a href="vouchers.php" class="nav-item <?php echo (strpos($request, 'vouchers.php') !== false) ? 'active' : '' ?>">
         <span class="nav-icon"><i class="fas fa-tags"></i></span>
         <span class="nav-text">Mã giảm giá</span>
@@ -40,6 +56,10 @@
   <a href="sliders.php" class="nav-item <?php echo (strpos($request, 'sliders.php') !== false) ? 'active' : '' ?>">
         <span class="nav-icon"><i class="fas fa-images"></i></span>
         <span class="nav-text">Banner</span>
+      </a>
+  <a href="partners.php" class="nav-item <?php echo (strpos($request, 'partners.php') !== false) ? 'active' : '' ?>">
+        <span class="nav-icon"><i class="fas fa-handshake"></i></span>
+        <span class="nav-text">Đối tác</span>
       </a>
   <a href="activity_logs.php" class="nav-item <?php echo (strpos($request, 'activity_logs.php') !== false) ? 'active' : '' ?>">
         <span class="nav-icon"><i class="fas fa-history"></i></span>
@@ -56,4 +76,5 @@
       <div style="display:flex;gap:12px;align-items:center;justify-content:center">
         <div style="font-weight:700;color:#1f2937;font-size:18px"></div>
       </div>
+    </div>
     <div class="main-content">

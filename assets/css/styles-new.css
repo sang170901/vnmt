@@ -1,31 +1,56 @@
-/* CSS Variables - Eco-Friendly Light Blue Theme */
+/* CSS Variables - Red Pantone Theme - Nổi bật và Chuyên nghiệp */
 :root {
-    --primary-color: #0891b2;         /* Cyan 600 - sạch sẽ, mát mẻ */
-    --primary-dark: #0e7490;          /* Cyan 700 - đậm hơn cho hover */
-    --primary-light: #06b6d4;         /* Cyan 500 - nhạt hơn */
+    /* Primary Colors - Đỏ Pantone (Chính) */
+    --primary-color: #C8102E;         /* Pantone 186 C (Red 032 C) - màu chính đỏ Pantone */
+    --primary-dark: #A00D26;          /* Đậm hơn cho hover */
+    --primary-light: #E4002B;        /* Pantone 199 C - sáng hơn */
+    --primary-lighter: #F5696B;       /* Nhạt hơn */
+    
+    /* Accent Colors - Đỏ Pantone (Phụ) */
+    --accent-color: #DA1A32;          /* Pantone 485 C - màu accent đỏ đậm */
+    --accent-dark: #B91C1C;          /* Đậm hơn */
+    --accent-light: #EF4444;         /* Red 500 - nhạt hơn */
+    --accent-lighter: #F87171;       /* Red 400 - rất nhạt */
+    
+    /* Secondary Colors */
     --secondary-color: #64748b;       /* Slate 500 - trung tính */
-    --accent-color: #10b981;          /* Emerald 500 - thân thiện môi trường */
-    --accent-secondary: #f59e0b;      /* Amber 500 - điểm nhấn */
-    --text-primary: #1f2937;          /* Gray 800 - dark text for readability */
-    --text-secondary: #4b5563;        /* Gray 600 - secondary text */
-    --text-light: #6b7280;            /* Gray 500 - light text */
+    --text-primary: #1e293b;          /* Slate 800 - dark text for readability */
+    --text-secondary: #475569;        /* Slate 600 - secondary text */
+    --text-light: #64748b;            /* Slate 500 - light text */
+    
+    /* Background Colors - Nền đỏ nhạt chủ đạo */
     --bg-primary: #ffffff;            /* Trắng tinh khiết */
-    --bg-secondary: #f0f9ff;          /* Sky 50 - nền nhạt */
-    --bg-tertiary: #e0f2fe;           /* Sky 100 - nền đậm hơn */
-    --bg-accent: #ecfdf5;             /* Emerald 50 - nền xanh lá */
+    --bg-secondary: #fef2f2;          /* Red 50 - nền nhạt đỏ chủ đạo */
+    --bg-tertiary: #fee2e2;           /* Red 100 - nền đỏ nhạt hơn */
+    --bg-accent: #fef2f2;             /* Red 50 - nền accent */
+    --bg-gradient: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); /* Gradient nền đỏ */
+    
+    /* Border Colors */
     --border-color: #cbd5e1;          /* Slate 300 - viền */
     --border-light: #e2e8f0;          /* Slate 200 - viền nhạt */
-    --shadow-sm: 0 1px 2px 0 rgba(8, 145, 178, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(8, 145, 178, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(8, 145, 178, 0.1);
-    --shadow-colored: 0 8px 25px rgba(8, 145, 178, 0.15);
+    --border-primary: rgba(200, 16, 46, 0.2); /* Red Pantone border */
+    --border-accent: rgba(218, 26, 50, 0.2);   /* Red Pantone accent border */
+    
+    /* Shadows - Đỏ Pantone */
+    --shadow-sm: 0 1px 2px 0 rgba(200, 16, 46, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(200, 16, 46, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(200, 16, 46, 0.1);
+    --shadow-colored: 0 8px 25px rgba(200, 16, 46, 0.2);
+    --shadow-accent: 0 8px 25px rgba(218, 26, 50, 0.2);
+    --shadow-mixed: 0 8px 25px rgba(200, 16, 46, 0.15), 0 4px 12px rgba(218, 26, 50, 0.15);
+    
+    /* Border Radius */
     --border-radius: 0.75rem;         /* Rounded corners lớn hơn */
+    
+    /* Font */
     --font-family: 'Nunito Sans', 'Open Sans', 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; /* Vietnamese-friendly fonts */
     
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
-    --gradient-secondary: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    --gradient-accent: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    /* Gradients - Đỏ Pantone */
+    --gradient-primary: linear-gradient(135deg, #C8102E 0%, #E4002B 100%); /* Đỏ Pantone chính */
+    --gradient-accent: linear-gradient(135deg, #DA1A32 0%, #EF4444 100%); /* Đỏ Pantone accent */
+    --gradient-secondary: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); /* Nền nhạt đỏ */
+    --gradient-mixed: linear-gradient(135deg, #C8102E 0%, #E4002B 50%, #DA1A32 100%); /* Kết hợp đỏ Pantone */
+    --gradient-hero: linear-gradient(135deg, #C8102E 0%, #A00D26 50%, #DA1A32 100%); /* Hero gradient đỏ */
 }
 
 /* Reset and Base Styles */
@@ -108,8 +133,20 @@ p {
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 30px rgba(8, 145, 178, 0.25);
-    background: linear-gradient(135deg, #0e7490 0%, #0891b2 100%);
+    box-shadow: 0 12px 30px rgba(37, 99, 235, 0.3);
+    background: linear-gradient(135deg, #A00D26 0%, #C8102E 100%);
+}
+
+.btn-accent {
+    background: var(--gradient-accent);
+    color: white;
+    box-shadow: var(--shadow-accent);
+}
+
+.btn-accent:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px rgba(239, 68, 68, 0.3);
+    background: linear-gradient(135deg, #B91C1C 0%, #DA1A32 100%);
 }
 
 .btn-outline {
@@ -122,6 +159,20 @@ p {
 
 .btn-outline:hover {
     box-shadow: inset 0 0 0 2rem var(--primary-color);
+    color: white;
+    transform: translateY(-2px);
+}
+
+.btn-outline-accent {
+    background-color: transparent;
+    color: var(--accent-color);
+    border: 2px solid var(--accent-color);
+    box-shadow: inset 0 0 0 0 var(--accent-color);
+    transition: all 0.3s ease;
+}
+
+.btn-outline-accent:hover {
+    box-shadow: inset 0 0 0 2rem var(--accent-color);
     color: white;
     transform: translateY(-2px);
 }
@@ -239,6 +290,12 @@ p {
     color: var(--text-secondary);
     line-height: 1.7;
     transition: color 0.3s ease;
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto;
+    -ms-hyphens: auto;
 }
 
 .mission-card:hover .mission-description {
@@ -827,6 +884,12 @@ p {
     color: var(--text-secondary);
     line-height: 1.7;
     transition: color 0.3s ease;
+    text-align: justify;
+    text-justify: inter-word;
+    hyphens: auto;
+    -webkit-hyphens: auto;
+    -moz-hyphens: auto;
+    -ms-hyphens: auto;
 }
 
 .mission-card:hover .mission-description {

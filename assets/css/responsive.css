@@ -3192,22 +3192,22 @@
     
     .products-section h2,
     .products-section .section-title {
-        font-size: 0.95rem !important;
+        font-size: 1.2rem !important;
         margin-bottom: 0.5rem !important;
-        line-height: 1.25 !important;
+        line-height: 1.3 !important;
         word-break: break-word !important;
     }
     
     .products-section h2 i,
     .products-section .section-title i {
-        font-size: 0.85rem !important;
-        margin-right: 0.4rem !important;
+        font-size: 1rem !important;
+        margin-right: 0.5rem !important;
     }
     
     .products-section .btn-view-all,
     .products-section a[href*="products"] {
-        font-size: 0.75rem !important;
-        padding: 0.5rem 0.85rem !important;
+        font-size: 0.85rem !important;
+        padding: 0.6rem 1rem !important;
         width: 100% !important;
     }
     
@@ -3281,21 +3281,21 @@
     
     .products-section h2,
     .products-section .section-title {
-        font-size: 0.9rem !important;
-        margin-bottom: 0.45rem !important;
-        line-height: 1.2 !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 0.5rem !important;
+        line-height: 1.25 !important;
         word-break: break-word !important;
     }
     
     .products-section h2 i,
     .products-section .section-title i {
-        font-size: 0.8rem !important;
+        font-size: 0.95rem !important;
     }
     
     .products-section .btn-view-all,
     .products-section a[href*="products"] {
-        font-size: 0.72rem !important;
-        padding: 0.48rem 0.8rem !important;
+        font-size: 0.8rem !important;
+        padding: 0.55rem 0.9rem !important;
         width: 100% !important;
     }
 }
@@ -3358,20 +3358,20 @@
     
     .products-section h2,
     .products-section .section-title {
-        font-size: 0.85rem !important;
-        margin-bottom: 0.4rem !important;
+        font-size: 1rem !important;
+        margin-bottom: 0.45rem !important;
         line-height: 1.2 !important;
     }
     
     .products-section h2 i,
     .products-section .section-title i {
-        font-size: 0.75rem !important;
+        font-size: 0.9rem !important;
     }
     
     .products-section .btn-view-all,
     .products-section a[href*="products"] {
-        font-size: 0.7rem !important;
-        padding: 0.45rem 0.75rem !important;
+        font-size: 0.75rem !important;
+        padding: 0.5rem 0.85rem !important;
         width: 100% !important;
     }
     
@@ -3421,20 +3421,20 @@
     
     .products-section h2,
     .products-section .section-title {
-        font-size: 0.82rem !important;
+        font-size: 0.95rem !important;
         margin-bottom: 0.4rem !important;
         line-height: 1.2 !important;
     }
     
     .products-section h2 i,
     .products-section .section-title i {
-        font-size: 0.72rem !important;
+        font-size: 0.85rem !important;
     }
     
     .products-section .btn-view-all,
     .products-section a[href*="products"] {
-        font-size: 0.68rem !important;
-        padding: 0.42rem 0.7rem !important;
+        font-size: 0.72rem !important;
+        padding: 0.48rem 0.8rem !important;
     }
 }
 
@@ -3486,21 +3486,21 @@
     
     .products-section h2,
     .products-section .section-title {
-        font-size: 0.78rem !important;
-        margin-bottom: 0.35rem !important;
+        font-size: 0.88rem !important;
+        margin-bottom: 0.4rem !important;
         line-height: 1.2 !important;
     }
     
     .products-section h2 i,
     .products-section .section-title i {
-        font-size: 0.68rem !important;
-        margin-right: 0.3rem !important;
+        font-size: 0.8rem !important;
+        margin-right: 0.35rem !important;
     }
     
     .products-section .btn-view-all,
     .products-section a[href*="products"] {
-        font-size: 0.65rem !important;
-        padding: 0.4rem 0.65rem !important;
+        font-size: 0.7rem !important;
+        padding: 0.45rem 0.75rem !important;
     }
 }
 

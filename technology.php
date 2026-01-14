@@ -1,55 +1,122 @@
 <?php 
 // Set proper encoding for Vietnamese
 header('Content-Type: text/html; charset=UTF-8');
+require_once 'config.php';
 include 'inc/header-new.php'; 
+?>
+
+<?php
 require_once 'inc/db_frontend.php';
+require_once 'inc/url_helpers.php';
+require_once 'backend/inc/helpers.php';
 
 // Pagination and filter parameters
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 12;
+$limit = 40;
 $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$category = isset($_GET['category']) ? trim($_GET['category']) : '';
+$categoryId = isset($_GET['category_id']) ? (int)$_GET['category_id'] : 0; // Lọc theo category_id của danh mục con
 
 try {
     $pdo = getFrontendPDO();
     
-    // Build query with filters  
-    $whereClause = "WHERE category = 'công nghệ'";
-    $params = [];
-    
-    if (!empty($search)) {
-        $whereClause .= " AND (name LIKE :search OR description LIKE :search)";
-        $params[':search'] = "%$search%";
+    // Build query with filters - sử dụng cả category text VÀ category_id
+    if ($categoryId > 0) {
+        // Lọc theo danh mục con cụ thể
+        $whereClause = "WHERE p.category_id = :category_id AND p.status = 1";
+        $params = [':category_id' => $categoryId];
+    } else {
+        // Lấy TẤT CẢ sản phẩm công nghệ: cả category text VÀ category_id
+        $whereClause = "WHERE ((p.category = 'Công nghệ' OR p.category = 'công nghệ') 
+                        OR p.category_id IN (SELECT id FROM categories WHERE id = 5 OR parent_id = 5)) 
+                        AND p.status = 1";
+        $params = [];
     }
     
-    if (!empty($category)) {
-        $whereClause .= " AND classification = :category";
-        $params[':category'] = $category;
-    }
-    
-    // Get total count
-    $countQuery = "SELECT COUNT(*) as total FROM products $whereClause";
-    $countStmt = $pdo->prepare($countQuery);
-    $countStmt->execute($params);
-    $totalItems = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
-    $totalPages = ceil($totalItems / $limit);
-    
-    // Get technology with pagination
-    $technologyQuery = "SELECT * FROM products $whereClause ORDER BY created_at DESC LIMIT :limit OFFSET :offset";
-    $technologyStmt = $pdo->prepare($technologyQuery);
+    // Lấy tất cả sản phẩm trước (để lọc bằng PHP)
+    $allProductsQuery = "SELECT p.* FROM products p $whereClause ORDER BY p.created_at DESC";
+    $allProductsStmt = $pdo->prepare($allProductsQuery);
     foreach ($params as $key => $value) {
-        $technologyStmt->bindValue($key, $value);
+        $allProductsStmt->bindValue($key, $value);
     }
-    $technologyStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $technologyStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-    $technologyStmt->execute();
-    $technology = $technologyStmt->fetchAll(PDO::FETCH_ASSOC);
+    $allProductsStmt->execute();
+    $allProducts = $allProductsStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get technology categories for filter
-    $categoryQuery = "SELECT DISTINCT classification FROM products WHERE category = 'công nghệ' AND classification IS NOT NULL ORDER BY classification";
-    $categoryStmt = $pdo->query($categoryQuery);
-    $categories = $categoryStmt->fetchAll(PDO::FETCH_ASSOC);
+    // Lọc theo tìm kiếm bằng PHP (hỗ trợ không dấu)
+    if (!empty($search)) {
+        $searchLower = mb_strtolower(trim($search), 'UTF-8');
+        $searchNoAccent = mb_strtolower(removeVietnameseAccents($search), 'UTF-8');
+        $searchLength = mb_strlen($searchNoAccent);
+        $hasAccent = ($searchLower !== $searchNoAccent);
+        
+        $filteredProducts = [];
+        foreach ($allProducts as $product) {
+            $nameLower = mb_strtolower(trim($product['name']), 'UTF-8');
+            $nameNoAccent = mb_strtolower(removeVietnameseAccents($product['name']), 'UTF-8');
+            
+            $matched = false;
+            
+            // Hàm kiểm tra match trong từ
+            $checkMatch = function($text, $searchTerm) use ($searchLength) {
+                $words = preg_split('/[\s\-_\.]+/', $text);
+                foreach ($words as $word) {
+                    $word = trim($word);
+                    if (empty($word)) continue;
+                    $wordLength = mb_strlen($word);
+                    if ($word === $searchTerm && $searchLength >= 2) return true;
+                    if ($wordLength > $searchLength && mb_substr($word, 0, $searchLength) === $searchTerm) {
+                        if (($wordLength - $searchLength) >= 2) return true;
+                    }
+                }
+                return false;
+            };
+            
+            if ($hasAccent) {
+                // Từ khóa có dấu - chỉ tìm có dấu
+                if ($nameLower === $searchLower && $searchLength >= 2) $matched = true;
+                elseif ($searchLength >= 2 && strpos($nameLower, $searchLower) === 0) $matched = true;
+                elseif ($checkMatch($nameLower, $searchLower)) $matched = true;
+            } else {
+                // Từ khóa không dấu - tìm cả có dấu và không dấu
+                if ($nameNoAccent === $searchNoAccent && $searchLength >= 2) $matched = true;
+                elseif ($searchLength >= 2 && strpos($nameNoAccent, $searchNoAccent) === 0) $matched = true;
+                elseif ($checkMatch($nameNoAccent, $searchNoAccent)) $matched = true;
+            }
+            
+            if ($matched) $filteredProducts[] = $product;
+        }
+        $allProducts = $filteredProducts;
+    }
+    
+    // Pagination
+    $totalItems = count($allProducts);
+    $totalPages = ceil($totalItems / $limit);
+    $technology = array_slice($allProducts, $offset, $limit);
+    
+    // Get technology SUB-CATEGORIES (danh mục con) for filter
+    $categoriesQuery = "
+        SELECT c.id, c.name, COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON c.id = p.category_id AND p.status = 1
+        WHERE c.parent_id = 5
+        GROUP BY c.id, c.name
+        ORDER BY c.id
+    ";
+    $categoriesStmt = $pdo->query($categoriesQuery);
+    $subCategories = $categoriesStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // For backward compatibility - keep old categories variable
+    $categories = [];
+    $categoryCounts = [];
+    
+    // Build old format for existing code, thêm 'id' để filter
+    foreach ($subCategories as $subCat) {
+        $categories[] = [
+            'id' => $subCat['id'],
+            'classification' => $subCat['name']
+        ];
+        $categoryCounts[$subCat['name']] = $subCat['product_count'];
+    }
     
 } catch (Exception $e) {
     $technology = [];
@@ -60,576 +127,490 @@ try {
 }
 ?>
 
-<style>
-    .technology-hero {
-        /* make background span full viewport width */
-        position: relative;
-        left: 50%;
-        right: 50%;
-        margin-left: -50vw;
-        margin-right: -50vw;
-        width: 100vw;
-        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
-        padding: 60px 0 40px;
-        overflow: hidden;
-        min-height: 200px; /* ensure visible hero area */
-    }
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công Nghệ Xây Dựng - VNMaterial</title>
     
-    .technology-hero::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(21,101,192,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
-        opacity: 0.3;
-    }
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    .hero-content {
-        max-width: 1400px; /* wider content */
-        margin: 0 auto;
-        padding: 0 20px;
-        text-align: center;
-        position: relative;
-        z-index: 2;
-    }
-    
-    .hero-title {
-        font-size: 2.45rem;
-        font-weight: 800;
-        color: #1565c0;
-        margin-bottom: 1.05rem;
-        text-shadow: 0 2px 8px rgba(21,101,192,0.2);
-    }
-    
-    .hero-subtitle {
-        font-size: 0.91rem;
-        color: #1976d2;
-        max-width: 900px; /* allow wider subtitle */
-        margin: 0 auto 1.75rem;
-        font-weight: 400;
-    }
-    
-    .hero-search {
-        max-width: 600px;
-        margin: 0 auto;
-        position: relative;
-    }
-    
-    .search-form {
-        display: flex;
-        gap: 10px;
-        background: white;
-        border-radius: 50px;
-        padding: 8px;
-        box-shadow: 0 8px 32px rgba(21,101,192,0.15);
-        backdrop-filter: blur(10px);
-    }
-    
-    .search-input {
-        flex: 1;
-        border: none;
-        padding: 15px 20px;
-        border-radius: 50px;
-        font-size: 1rem;
-        background: transparent;
-        outline: none;
-    }
-    
-    .search-btn {
-        background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
-        color: white;
-        border: none;
-        padding: 15px 30px;
-        border-radius: 50px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: all 0.3s;
-        box-shadow: 0 4px 15px rgba(66,165,245,0.3);
-    }
-    
-    .search-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(66,165,245,0.4);
-    }
-
-    /* Main content container */
-    .main-content {
-        max-width: 1400px;
-        margin: 0 auto;
-        padding: 40px 20px;
-    }
-
-    /* Filter section */
-    .filter-section {
-        background: white;
-        border-radius: 20px;
-        padding: 30px;
-        margin-bottom: 30px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-
-    .filter-header {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 20px;
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: #1565c0;
-    }
-
-    .filter-controls {
-        display: flex;
-        gap: 15px;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .search-box, .category-filter {
-        flex: 1;
-        min-width: 200px;
-    }
-
-    .search-box input, .category-filter select {
-        width: 100%;
-        padding: 12px 15px;
-        border: 2px solid #e3f2fd;
-        border-radius: 12px;
-        font-size: 1rem;
-        transition: border-color 0.3s;
-    }
-
-    .search-box input:focus, .category-filter select:focus {
-        border-color: #42a5f5;
-        outline: none;
-    }
-
-    .filter-btn {
-        background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
-        color: white;
-        border: none;
-        padding: 12px 25px;
-        border-radius: 12px;
-        cursor: pointer;
-        font-weight: 600;
-        transition: transform 0.2s;
-    }
-
-    .filter-btn:hover {
-        transform: translateY(-2px);
-    }
-
-    /* Results header */
-    .results-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 30px;
-        padding: 20px 0;
-    }
-
-    .results-count {
-        font-size: 1.1rem;
-        color: #64748b;
-    }
-
-    /* Technology grid */
-    .technology-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 30px;
-        margin-bottom: 50px;
-    }
-
-    .technology-card {
-        background: white;
-        border-radius: 20px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-        transition: all 0.3s ease;
-        border: 1px solid #f1f5f9;
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-
-    .technology-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 12px 40px rgba(0,0,0,0.12);
-    }
-
-    .technology-header {
-        position: relative;
-        height: 220px;
-        overflow: hidden;
-    }
-
-    .technology-image {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: transform 0.3s;
-    }
-
-    .technology-card:hover .technology-image {
-        transform: scale(1.05);
-    }
-
-    .technology-category {
-        position: absolute;
-        top: 15px;
-        right: 15px;
-        background: rgba(66, 165, 245, 0.9);
-        color: white;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 500;
-    }
-
-    .technology-body {
-        padding: 25px;
-        display: flex;
-        flex-direction: column;
-        flex-grow: 1;
-    }
-
-    .technology-name {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #1e293b;
-        margin-bottom: 12px;
-        line-height: 1.4;
-        min-height: 3.3rem; /* Fixed height for 2 lines */
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .technology-description {
-        color: #64748b;
-        line-height: 1.6;
-        margin-bottom: 20px;
-        font-size: 0.95rem;
-        min-height: 4.8rem; /* Fixed height for 3 lines */
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        flex-grow: 1;
-    }
-
-    .technology-details {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 15px;
-        margin-bottom: 25px;
-        min-height: 2.5rem; /* Fixed height for details */
-    }
-
-    .technology-details > div {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.9rem;
-        color: #64748b;
-    }
-
-    .technology-details i {
-        color: #42a5f5;
-        width: 16px;
-    }
-
-    .price {
-        font-weight: 600;
-        color: #059669;
-    }
-
-    .technology-actions {
-        display: flex;
-        gap: 10px;
-        margin-top: auto; /* Push buttons to bottom */
-    }
-
-    .view-btn, .supplier-btn {
-        flex: 1;
-        padding: 12px;
-        border: none;
-        border-radius: 12px;
-        cursor: pointer;
-        font-weight: 500;
-        text-decoration: none;
-        text-align: center;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-    }
-
-    .view-btn {
-        background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
-        color: white;
-    }
-
-    .supplier-btn {
-        background: #f8fafc;
-        color: #64748b;
-        border: 1px solid #e2e8f0;
-    }
-
-    .view-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(66,165,245,0.3);
-    }
-
-    .supplier-btn:hover {
-        background: #f1f5f9;
-        color: #42a5f5;
-    }
-
-    /* No results */
-    .no-results {
-        text-align: center;
-        padding: 80px 20px;
-        background: white;
-        border-radius: 20px;
-        margin: 40px 0;
-    }
-
-    .no-results i {
-        font-size: 4rem;
-        color: #e2e8f0;
-        margin-bottom: 20px;
-    }
-
-    .no-results h3 {
-        font-size: 1.5rem;
-        color: #64748b;
-        margin-bottom: 10px;
-    }
-
-    .no-results p {
-        color: #94a3b8;
-        max-width: 400px;
-        margin: 0 auto;
-    }
-
-    /* Pagination */
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 50px;
-    }
-
-    .page-link {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 12px 16px;
-        border: 1px solid #e2e8f0;
-        color: #64748b;
-        text-decoration: none;
-        border-radius: 10px;
-        transition: all 0.2s;
-        font-weight: 500;
-    }
-
-    .page-link:hover, .page-link.active {
-        background: #42a5f5;
-        color: white;
-        border-color: #42a5f5;
-    }
-
-    /* Responsive */
-    @media (max-width: 768px) {
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f0f9ff;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+        
+        .materials-hero {
+            position: relative;
+            left: 50%;
+            right: 50%;
+            margin-left: -50vw;
+            margin-right: -50vw;
+            width: 100vw;
+            background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+            padding: 120px 0 80px;
+            overflow: hidden;
+            min-height: 420px;
+        }
+        
+        .materials-hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(56,189,248,0.15)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.4;
+        }
+        
+        .hero-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        
         .hero-title {
-            font-size: 1.75rem;
+            font-size: 3.5rem;
+            font-weight: 800;
+            color: #0284c7;
+            margin-bottom: 1.5rem;
+            text-shadow: 0 2px 8px rgba(56,189,248,0.2);
         }
         
-        .search-form {
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: #0ea5e9;
+            max-width: 900px;
+            margin: 0 auto 2.5rem;
+            font-weight: 400;
+        }
+        
+        /* Category Filter */
+        .category-filter {background: white;border-radius: 16px;padding: 1.5rem;margin: -60px auto 2rem;max-width: 1280px;position: relative;z-index: 10;box-shadow: 0 10px 40px rgba(0,0,0,0.08);}
+        .filter-header {display: flex;align-items: center;justify-content: space-between;margin-bottom: 1.2rem;flex-wrap: wrap;gap: 1rem;}
+        .filter-title {font-size: 0.875rem;font-weight: 700;color: #64748b;text-transform: uppercase;letter-spacing: 0.5px;display: flex;align-items: center;gap: 0.5rem;}
+        .search-box {position: relative;display: flex;flex: 1;max-width: 450px;box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);border-radius: 12px;overflow: hidden;background: white;}
+        .search-input {flex: 1;padding: 0.875rem 1.25rem;padding-right: 3.5rem;border: 2px solid #e0f2fe;border-radius: 12px;font-size: 0.9375rem;transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);background: white;}
+        .search-input:focus {outline: none;border-color: #3b82f6;box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);transform: translateY(-2px);}
+        .search-input::placeholder {color: #94a3b8;}
+        .search-btn {position: absolute;right: 4px;top: 50%;transform: translateY(-50%);width: 40px;height: 40px;padding: 0;background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color: white;border: none;border-radius: 50%;font-size: 1rem;cursor: pointer;transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);display: flex;align-items: center;justify-content: center;}
+        .search-btn:hover {background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);transform: translateY(-50%) scale(1.05);box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);}
+        .search-btn:active {transform: translateY(-50%) scale(0.95);}
+        .search-btn i {font-size: 1rem;}
+        .category-pills {display: flex;flex-wrap: wrap;gap: 0.75rem;}
+        .category-pill {padding: 0.625rem 1.25rem;background: #f1f5f9;color: #64748b;border: 2px solid transparent;border-radius: 50px;font-size: 0.875rem;font-weight: 600;text-decoration: none;transition: all 0.2s;display: inline-flex;align-items: center;gap: 0.5rem;cursor: pointer;}
+        .category-pill:hover {background: #e0f2fe;color: #2563eb;border-color: #3b82f6;}
+        .category-pill.active {background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);color: white;border-color: #3b82f6;}
+        .category-pill .count {background: rgba(255,255,255,0.25);padding: 0.125rem 0.5rem;border-radius: 50px;font-size: 0.75rem;font-weight: 700;}
+        
+        .main-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 30px;
+        }
+        
+        .materials-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.25rem;
+            margin-bottom: 2.5rem;
+            align-items: stretch;
+        }
+        
+        .material-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+            transition: all 0.28s ease;
+            position: relative;
+            border: 1px solid #f1f5f9;
+            padding: 0;
+            display: flex;
             flex-direction: column;
-            padding: 15px;
+            height: 100%;
+            cursor: pointer;
         }
         
-        .filter-controls {
+        .material-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        
+        .material-header {
+            padding: 0;
+            background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 160px;
+            overflow: hidden;
+        }
+        
+        .material-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .material-category {
+            position: absolute;
+            top: 0.75rem;
+            right: 0.75rem;
+            background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
+            color: white;
+            padding: 0.35rem 0.75rem;
+            border-radius: 16px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
+        }
+        
+        .material-body {
+            padding: 0.85rem 0.85rem 0.75rem;
+            flex: 1 1 auto;
+            display: flex;
             flex-direction: column;
         }
         
-        .technology-grid {
-            grid-template-columns: 1fr;
+        .material-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 0.4rem;
+            text-align: center;
+            min-height: 2.3rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
         
-        .technology-details {
-            grid-template-columns: 1fr;
+        .material-description {
+            color: #64748b;
+            margin-bottom: 0.65rem;
+            line-height: 1.35;
+            text-align: center;
+            font-size: 0.82rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            min-height: 2.2rem;
         }
         
-        .technology-actions {
-            flex-direction: column;
+        .material-details {
+            margin-bottom: 0.6rem;
         }
-    }
-</style>
+        
+        .material-detail {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            color: #475569;
+            font-size: 0.82rem;
+            margin-bottom: 0.4rem;
+        }
+        
+        .material-detail i {
+            width: 14px;
+            color: #38bdf8;
+            font-size: 0.9rem;
+        }
+        
+        .material-footer {
+            padding: 0.65rem 0.85rem 0.85rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+            border-top: 1px solid #f1f5f9;
+        }
+        
+        .view-material {
+            background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
+            color: white;
+            padding: 0.5rem 1.2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.8rem;
+            transition: all 0.22s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            box-shadow: 0 2px 8px rgba(56, 189, 248, 0.25);
+        }
 
-<!-- Hero Section -->
-<section class="technology-hero">
-    <div class="hero-content">
-        <h1 class="hero-title">CÔNG NGHỆ XÂY DỰNG</h1>
-        <p class="hero-subtitle">
-            Công nghệ xây dựng hiện đại bao gồm các giải pháp thông minh, hệ thống tự động hóa và các công nghệ tiên tiến.<br>
-            Từ nhà thông minh, năng lượng xanh đến các giải pháp xây dựng bền vững và thân thiện với môi trường.
-        </p>
-    </div>
-</section>
+        .view-material:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);
+            text-decoration: none;
+            color: white;
+            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+        }
+        
+        .material-price {
+            color: #059669;
+            font-size: 0.85rem;
+            font-weight: 700;
+            display: none;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 3rem 0;
+        }
+        
+        .pagination a, .pagination span {
+            padding: 0.8rem 1.2rem;
+            border-radius: 10px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .pagination a {
+            background: white;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .pagination a:hover {
+            background: #38bdf8;
+            color: white;
+            border-color: #38bdf8;
+        }
+        
+        .pagination .current {
+            background: #38bdf8;
+            color: white;
+            border: 1px solid #38bdf8;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #64748b;
+        }
+        
+        .no-results i {
+            font-size: 4rem;
+            color: #cbd5e1;
+            margin-bottom: 1.5rem;
+        }
+        
+        .no-results h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: #475569;
+        }
+        
+        @media (max-width: 1200px) {
+            .materials-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
 
-<!-- Main Content -->
-<div class="main-content">
-    <!-- Filter Section -->
-    <div class="filter-section">
-        <div class="filter-header">
-            <i class="fas fa-filter"></i> Bộ lọc tìm kiếm
+        @media (max-width: 900px) {
+            .materials-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 560px) {
+            .materials-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="materials-hero">
+        <div class="hero-content">
+            <h1 class="hero-title"><?php echo t('technology_title'); ?></h1>
+            <p class="hero-subtitle">
+                <?php echo t('technology_description'); ?>
+            </p>
         </div>
-        <form method="GET" action="">
-            <div class="filter-controls">
-                <div class="search-box">
-                    <input type="text" 
-                           name="search" 
-                           placeholder="Tìm kiếm công nghệ..." 
-                           value="<?php echo htmlspecialchars($search); ?>">
-                </div>
-                <div class="category-filter">
-                    <select name="category">
-                        <option value="">Tất cả danh mục</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?php echo htmlspecialchars($cat['classification']); ?>" 
-                                    <?php echo $category === $cat['classification'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($cat['classification']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <button type="submit" class="filter-btn">
-                    <i class="fas fa-search"></i> Lọc
-                </button>
+    </section>
+
+    <!-- Search Section -->
+    <div class="main-content">
+        <div class="category-filter">
+            <div class="filter-header">
+                <span class="filter-title"><i class="fas fa-tags"></i> DANH MỤC</span>
+                <form method="GET" action="" class="search-box">
+                    <input type="text" name="search" class="search-input" placeholder="<?php echo t('technology_search_placeholder'); ?>" value="<?php echo htmlspecialchars($search); ?>">
+                    <?php if ($categoryId > 0): ?><input type="hidden" name="category_id" value="<?php echo $categoryId; ?>"><?php endif; ?>
+                    <button type="submit" class="search-btn" title="Tìm kiếm"><i class="fas fa-search"></i></button>
+                </form>
             </div>
-        </form>
-    </div>
-
-    <!-- Results Header -->
-    <div class="results-header">
-        <div class="results-count">
-            Tìm thấy <?php echo number_format($totalItems); ?> công nghệ
-            <?php if (!empty($search) || !empty($category)): ?>
-                <span style="color: #42a5f5; font-weight: 600;">
-                    (<?php echo !empty($search) ? "tìm kiếm: '$search'" : ''; ?>
-                    <?php echo !empty($category) ? "danh mục: '$category'" : ''; ?>)
-                </span>
-            <?php endif; ?>
+            <div class="category-pills">
+                <a href="technology.php<?php echo !empty($search) ? '?search=' . urlencode($search) : ''; ?>" 
+                   class="category-pill <?php echo $categoryId == 0 ? 'active' : ''; ?>">
+                    <i class="fas fa-th"></i><span>Tất cả</span><span class="count"><?php echo $totalItems; ?></span>
+                </a>
+                <?php foreach ($categories as $cat): 
+                    $catName = $cat['classification'];
+                    $catId = $cat['id'];
+                    $catCount = isset($categoryCounts[$catName]) ? $categoryCounts[$catName] : 0;
+                    $isActive = ($categoryId == $catId);
+                    $url = 'technology.php?category_id=' . $catId;
+                    if (!empty($search)) $url .= '&search=' . urlencode($search);
+                ?>
+                    <a href="<?php echo $url; ?>" class="category-pill <?php echo $isActive ? 'active' : ''; ?>">
+                        <span><?php echo htmlspecialchars($catName); ?></span><span class="count"><?php echo $catCount; ?></span>
+                    </a>
+                <?php endforeach; ?>
+            </div>
         </div>
-    </div>
 
-    <?php if (empty($technology)): ?>
-        <div class="no-results">
-            <i class="fas fa-microchip"></i>
-            <h3>Không tìm thấy công nghệ nào</h3>
-            <p>Hãy thử thay đổi từ khóa tìm kiếm hoặc danh mục để có kết quả tốt hơn.</p>
-        </div>
-    <?php else: ?>
-        <div class="technology-grid">
-            <?php foreach ($technology as $item): ?>
-                <div class="technology-card">
-                    <div class="technology-header">
-                        <?php if (!empty($item['featured_image'])): ?>
-                            <img src="<?php echo htmlspecialchars($item['featured_image']); ?>" 
-                                 alt="<?php echo htmlspecialchars($item['name']); ?>" 
-                                 class="technology-image">
-                        <?php else: ?>
-                            <div class="technology-image" style="background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%); display: flex; align-items: center; justify-content: center;">
-                                <i class="fas fa-microchip" style="color: white; font-size: 1.5rem;"></i>
-                            </div>
-                        <?php endif; ?>
-                        
+        <!-- Results -->
+        <?php if (!empty($search) || $categoryId > 0): ?>
+            <div style="margin-bottom: 2rem; text-align: center;">
+                <h2 style="color: #1e293b; margin-bottom: 0.5rem;">
+                    Tìm thấy <?php echo $totalItems; ?> công nghệ
+                </h2>
+                <?php if ($search): ?>
+                    <p style="color: #64748b;">Từ khóa: "<?php echo htmlspecialchars($search); ?>"</p>
+                <?php endif; ?>
+                <?php if ($categoryId > 0): ?>
+                    <?php
+                    $selectedCatName = '';
+                    foreach ($categories as $cat) {
+                        if ($cat['id'] == $categoryId) {
+                            $selectedCatName = $cat['classification'];
+                            break;
+                        }
+                    }
+                    ?>
+                    <p style="color: #64748b;">Danh mục: <?php echo htmlspecialchars($selectedCatName); ?></p>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
+        <!-- Technology Grid -->
+        <?php if (!empty($technology)): ?>
+            <div class="materials-grid">
+                <?php foreach ($technology as $item): ?>
+                    <div class="material-card" onclick="window.location.href='<?php echo buildProductUrl($item); ?>'">
                         <?php if (!empty($item['classification'])): ?>
-                            <div class="technology-category">
+                            <div class="material-category">
                                 <?php echo htmlspecialchars($item['classification']); ?>
                             </div>
                         <?php endif; ?>
-                    </div>
-                    
-                    <div class="technology-body">
-                        <h3 class="technology-name"><?php echo htmlspecialchars($item['name']); ?></h3>
                         
-                        <?php if (!empty($item['description'])): ?>
-                            <p class="technology-description">
-                                <?php echo htmlspecialchars(mb_substr($item['description'], 0, 120)) . (mb_strlen($item['description']) > 120 ? '...' : ''); ?>
+                        <div class="material-header">
+                            <?php if (!empty($item['featured_image'])): ?>
+                                <img src="<?php echo htmlspecialchars($item['featured_image']); ?>" 
+                                     alt="<?php echo htmlspecialchars($item['name']); ?>" 
+                                     class="material-image">
+                            <?php else: ?>
+                                <div class="material-image" style="background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%); display: flex; align-items: center; justify-content: center;">
+                                    <i class="fas fa-microchip" style="color: white; font-size: 3rem; opacity: 0.7;"></i>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="material-body">
+                            <h3 class="material-name"><?php echo htmlspecialchars($item['name']); ?></h3>
+                            <p class="material-description">
+                                <?php echo htmlspecialchars(substr($item['description'] ?? 'Công nghệ xây dựng hiện đại', 0, 80)); ?>
+                                <?php if (strlen($item['description'] ?? '') > 80): ?>...<?php endif; ?>
                             </p>
-                        <?php endif; ?>
-                        
-                        <div class="technology-details">
-                            <?php if (!empty($item['price'])): ?>
-                                <div class="price">
-                                    <i class="fas fa-tag"></i>
-                                    <?php echo number_format($item['price']); ?>đ
-                                </div>
-                            <?php endif; ?>
                             
-                            <?php if (!empty($item['brand'])): ?>
-                                <div class="brand">
-                                    <i class="fas fa-industry"></i>
-                                    <?php echo htmlspecialchars($item['brand']); ?>
-                                </div>
-                            <?php endif; ?>
+                            <div class="material-details">
+                                <?php if ($item['brand']): ?>
+                                    <div class="material-detail">
+                                        <i class="fas fa-industry"></i>
+                                        <span><?php echo htmlspecialchars($item['brand']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         
-                        <div class="technology-actions">
-                            <a href="product.php?id=<?php echo $item['id']; ?>" class="view-btn">
-                                <i class="fas fa-eye"></i> Xem chi tiết
+                        <div class="material-footer">
+                            <a href="<?php echo buildProductUrl($item); ?>" class="view-material" onclick="event.stopPropagation();">
+                                <span>Xem chi tiết</span>
+                                <i class="fas fa-arrow-right"></i>
                             </a>
-                            <?php if (!empty($item['supplier_id'])): ?>
-                                <a href="suppliers.php?id=<?php echo $item['supplier_id']; ?>" class="supplier-btn">
-                                    <i class="fas fa-handshake"></i> Nhà cung cấp
-                                </a>
-                            <?php endif; ?>
                         </div>
                     </div>
-                </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
 
-    <!-- Pagination -->
-    <?php if ($totalPages > 1): ?>
-        <div class="pagination">
-            <?php if ($page > 1): ?>
-                <a href="?page=<?php echo $page - 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?>" 
-                   class="page-link">
-                    <i class="fas fa-chevron-left"></i> Trước
-                </a>
+            <!-- Pagination -->
+            <?php if ($totalPages > 1): ?>
+                <div class="pagination">
+                    <?php
+                    $baseUrl = '?';
+                    if ($search) $baseUrl .= 'search=' . urlencode($search) . '&';
+                    if ($categoryId > 0) $baseUrl .= 'category_id=' . $categoryId . '&';
+                    ?>
+                    
+                    <?php if ($page > 1): ?>
+                        <a href="<?php echo $baseUrl; ?>page=<?php echo $page - 1; ?>">
+                            <i class="fas fa-chevron-left"></i> Trước
+                        </a>
+                    <?php endif; ?>
+                    
+                    <?php for ($i = max(1, $page - 2); $i <= min($totalPages, $page + 2); $i++): ?>
+                        <?php if ($i === $page): ?>
+                            <span class="current"><?php echo $i; ?></span>
+                        <?php else: ?>
+                            <a href="<?php echo $baseUrl; ?>page=<?php echo $i; ?>"><?php echo $i; ?></a>
+                        <?php endif; ?>
+                    <?php endfor; ?>
+                    
+                    <?php if ($page < $totalPages): ?>
+                        <a href="<?php echo $baseUrl; ?>page=<?php echo $page + 1; ?>">
+                            Sau <i class="fas fa-chevron-right"></i>
+                        </a>
+                    <?php endif; ?>
+                </div>
             <?php endif; ?>
-            
-            <?php
-            $startPage = max(1, $page - 2);
-            $endPage = min($totalPages, $page + 2);
-            
-            for ($i = $startPage; $i <= $endPage; $i++):
-            ?>
-                <a href="?page=<?php echo $i; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?>" 
-                   class="page-link <?php echo $i === $page ? 'active' : ''; ?>">
-                    <?php echo $i; ?>
+        <?php else: ?>
+            <div class="no-results">
+                <i class="fas fa-microchip"></i>
+                <h3><?php echo t('technology_no_results'); ?></h3>
+                <p><?php echo t('technology_no_results_hint'); ?></p>
+                <a href="technology.php" style="color: #38bdf8; text-decoration: none; font-weight: 600; margin-top: 1rem; display: inline-block;">
+                    ← <?php echo t('technology_view_all'); ?>
                 </a>
-            <?php endfor; ?>
-            
-            <?php if ($page < $totalPages): ?>
-                <a href="?page=<?php echo $page + 1; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?>" 
-                   class="page-link">
-                    Sau <i class="fas fa-chevron-right"></i>
-                </a>
-            <?php endif; ?>
-        </div>
-    <?php endif; ?>
-</div>
+            </div>
+        <?php endif; ?>
+    </div>
+</body>
+</html>
 
 <?php include 'inc/footer-new.php'; ?>

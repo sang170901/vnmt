@@ -29,6 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $featured = isset($_POST['featured']) ? 1 : 0;
     $supplier_id = !empty($_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null;
         $images = trim($_POST['images'] ?? '');
+        $videos = trim($_POST['videos'] ?? '');
         // New fields
         $manufacturer = trim($_POST['manufacturer'] ?? '');
         $origin = trim($_POST['origin'] ?? '');
@@ -52,12 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($auto) { $supplier_id = $auto; }
             }
             if ($id) {
-                $stmt = $pdo->prepare('UPDATE products SET name=?, slug=?, description=?, price=?, status=?, featured=?, images=?, supplier_id=?, manufacturer=?, origin=?, material_type=?, application=?, website=?, featured_image=?, product_function=?, category_id=?, thickness=?, color=?, warranty=?, stock=?, classification=?, brand=? WHERE id=?');
-                $stmt->execute([$name, $slug, $description, $price, $status, $featured, $images, $supplier_id, $manufacturer, $origin, $material_type, $application, $website, $featured_image, $product_function, $category_id, $thickness, $color, $warranty, $stock, $classification, $brand, $id]);
+                $stmt = $pdo->prepare('UPDATE products SET name=?, slug=?, description=?, price=?, status=?, featured=?, images=?, videos=?, supplier_id=?, manufacturer=?, origin=?, material_type=?, application=?, website=?, featured_image=?, product_function=?, category_id=?, thickness=?, color=?, warranty=?, stock=?, classification=?, brand=? WHERE id=?');
+                $stmt->execute([$name, $slug, $description, $price, $status, $featured, $images, $videos, $supplier_id, $manufacturer, $origin, $material_type, $application, $website, $featured_image, $product_function, $category_id, $thickness, $color, $warranty, $stock, $classification, $brand, $id]);
                 log_activity($_SESSION['user']['id'] ?? null, 'update_product', 'product', $id, json_encode(['name'=>$name,'price'=>$price]));
             } else {
-                $stmt = $pdo->prepare('INSERT INTO products (name, slug, description, price, status, featured, images, supplier_id, manufacturer, origin, material_type, application, website, featured_image, product_function, category_id, thickness, color, warranty, stock, classification, brand) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$name, $slug, $description, $price, $status, $featured, $images, $supplier_id, $manufacturer, $origin, $material_type, $application, $website, $featured_image, $product_function, $category_id, $thickness, $color, $warranty, $stock, $classification, $brand]);
+                $stmt = $pdo->prepare('INSERT INTO products (name, slug, description, price, status, featured, images, videos, supplier_id, manufacturer, origin, material_type, application, website, featured_image, product_function, category_id, thickness, color, warranty, stock, classification, brand) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$name, $slug, $description, $price, $status, $featured, $images, $videos, $supplier_id, $manufacturer, $origin, $material_type, $application, $website, $featured_image, $product_function, $category_id, $thickness, $color, $warranty, $stock, $classification, $brand]);
                 $newId = $pdo->lastInsertId();
                 log_activity($_SESSION['user']['id'] ?? null, 'create_product', 'product', $newId, json_encode(['name'=>$name,'price'=>$price]));
             }
@@ -96,6 +97,31 @@ if ($action === 'toggle' && $id) {
         $flash['type'] = 'error';
         $flash['message'] = 'Không thể thay đổi trạng thái: ' . $e->getMessage();
     }
+}
+
+// Get product data for AJAX (JSON)
+if ($action === 'get' && $id) {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $pdo->prepare('SELECT p.*, s.name as supplier_name FROM products p LEFT JOIN suppliers s ON p.supplier_id = s.id WHERE p.id = ?');
+        $stmt->execute([$id]);
+        $product = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($product) {
+            // Convert classification string to array
+            if (!empty($product['classification'])) {
+                $product['classification_array'] = explode(',', $product['classification']);
+            } else {
+                $product['classification_array'] = [];
+            }
+            echo json_encode(['success' => true, 'product' => $product]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Không tìm thấy sản phẩm']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
 }
 
 require __DIR__ . '/inc/header.php';
@@ -209,8 +235,11 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
         <div class="flash <?php echo $flash['type'] === 'success' ? 'success' : 'error' ?>"><?php echo htmlspecialchars($flash['message']) ?></div>
     <?php endif; ?>
 
-    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-        <a class="small-btn primary" href="products.php?action=add">+ Thêm sản phẩm</a>
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <button class="small-btn primary" onclick="openAddModal()">+ Thêm sản phẩm</button>
+        <a href="product_scraper.php" class="small-btn primary" style="text-decoration: none; display: inline-block; background: #10b981; color: white;">
+            🔍 Fetch từ URL (Scrape)
+        </a>
         <!-- Combined filters + search form -->
         <form method="get" action="products.php" style="display:flex;gap:10px;align-items:center;flex-wrap:nowrap;margin:0">
             <select name="category_id" class="compact-select" onchange="this.form.submit()">
@@ -277,7 +306,7 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
                     <a class="small-btn" href="../product-detail.php?id=<?php echo $p['id'] ?>" target="_blank" title="Xem chi tiết">
                         <i class="fas fa-eye"></i> Xem
                     </a>
-                    <a class="small-btn" href="products.php?action=edit&id=<?php echo $p['id'] ?>">Sửa</a>
+                    <button class="small-btn" onclick="openEditModal(<?php echo $p['id'] ?>)">Sửa</button>
                     <a class="small-btn warn" href="products.php?action=delete&id=<?php echo $p['id'] ?>" onclick="return confirm('Xóa sản phẩm?')">Xóa</a>
                 </td>
             </tr>
@@ -286,13 +315,17 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
     </table>
 </div>
 
-<?php if ($action === 'add' || $action === 'edit'): ?>
-<div class="card">
-    <h3 style="margin-top:0"><?php echo $action === 'edit' ? 'Sửa sản phẩm' : 'Thêm sản phẩm' ?></h3>
-    <?php if (!empty($flash['message']) && $flash['type'] === 'error'): ?>
-        <div class="flash error"><?php echo htmlspecialchars($flash['message']) ?></div>
-    <?php endif; ?>
-    <form method="post">
+<!-- Note: Do products có quá nhiều trường (20+ fields), modal sẽ dùng scroll -->
+
+<!-- Modal Thêm Sản Phẩm -->
+<div id="addModal" class="modal">
+    <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+        <div class="modal-header">
+            <h3 style="margin:0">Thêm Sản Phẩm Mới</h3>
+            <span class="modal-close" onclick="closeAddModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <form method="post" id="addProductForm">
         <div class="form-group">
             <label for="name">Tên sản phẩm</label>
             <input type="text" name="name" id="name" placeholder="Nhập tên sản phẩm" value="<?php echo htmlspecialchars($product['name'] ?? '') ?>" required>
@@ -325,6 +358,12 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
         <div class="form-group">
             <label for="images">Hình (URL, nhiều cái cách nhau bằng dấu phẩy)</label>
             <input type="text" name="images" id="images" value="<?php echo isset($product['images']) ? htmlspecialchars($product['images']) : '' ?>">
+            <small style="color: #666;">VD: https://example.com/image1.jpg, https://example.com/image2.jpg</small>
+        </div>
+        <div class="form-group">
+            <label for="videos">Video (URL YouTube/Vimeo, nhiều cái cách nhau bằng dấu phẩy)</label>
+            <input type="text" name="videos" id="videos" value="<?php echo isset($product['videos']) ? htmlspecialchars($product['videos']) : '' ?>">
+            <small style="color: #666;">VD: https://www.youtube.com/watch?v=xxxxx, https://vimeo.com/xxxxx</small>
         </div>
         <div class="form-group">
             <label for="featured_image">Hình đại diện (URL)</label>
@@ -351,17 +390,21 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
             <input type="text" name="product_function" id="product_function" value="<?php echo isset($product['product_function']) ? htmlspecialchars($product['product_function']) : '' ?>">
         </div>
         <div class="form-group">
-            <label for="category_id">Danh mục sản phẩm</label>
-            <select name="category_id" id="category_id" class="form-control">
-                <option value="">-- Chọn danh mục --</option>
+            <label>Danh mục cha</label>
+            <input type="text" id="parent_category_display" class="form-control" readonly style="background: #f5f5f5; color: #666;">
+        </div>
+        <div class="form-group">
+            <label for="category_id">Danh mục con <span style="color:red">*</span></label>
+            <select name="category_id" id="category_id" class="form-control" onchange="updateParentCategory(this)" required>
+                <option value="">-- Chọn danh mục con --</option>
                 <?php foreach ($categoriesGrouped as $group): ?>
                     <optgroup label="📁 <?php echo htmlspecialchars($group['main']['name']) ?>">
-                        <option value="<?php echo $group['main']['id'] ?>" <?php echo (isset($product['category_id']) && $product['category_id'] == $group['main']['id']) ? 'selected' : '' ?>>
-                            <?php echo htmlspecialchars($group['main']['name']) ?>
-                        </option>
                         <?php foreach ($group['subs'] as $sub): ?>
-                            <option value="<?php echo $sub['id'] ?>" <?php echo (isset($product['category_id']) && $product['category_id'] == $sub['id']) ? 'selected' : '' ?>>
-                                &nbsp;&nbsp;&nbsp;└── <?php echo htmlspecialchars($sub['name']) ?>
+                            <option value="<?php echo $sub['id'] ?>" 
+                                    data-parent-id="<?php echo $group['main']['id'] ?>"
+                                    data-parent-name="<?php echo htmlspecialchars($group['main']['name']) ?>"
+                                    <?php echo (isset($product['category_id']) && $product['category_id'] == $sub['id']) ? 'selected' : '' ?>>
+                                <?php echo htmlspecialchars($sub['name']) ?>
                             </option>
                         <?php endforeach; ?>
                     </optgroup>
@@ -410,12 +453,165 @@ $flash['message'] = $flash['message'] === 'Không thể xóa' ? 'Không thể x�
             <a class="small-btn" href="products.php" style="margin-left:12px">Hủy</a>
         </div>
     </form>
+        </div>
+    </div>
 </div>
-<?php endif; ?>
+
+<!-- Modal Sửa Sản Phẩm -->
+<div id="editModal" class="modal">
+    <div class="modal-content" style="max-width: 900px; max-height: 90vh;">
+        <div class="modal-header">
+            <h3 style="margin:0">Sửa Sản Phẩm</h3>
+            <span class="modal-close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <form method="post" id="editProductForm">
+                <input type="hidden" name="id" id="edit_id">
+                
+                <div class="form-group">
+                    <label for="edit_name">Tên sản phẩm</label>
+                    <input type="text" name="name" id="edit_name" placeholder="Nhập tên sản phẩm" required>
+                </div>
+                <div class="form-group">
+                    <label for="edit_slug">Slug</label>
+                    <input type="text" name="slug" id="edit_slug" placeholder="Nhập slug sản phẩm">
+                </div>
+                <div class="form-group">
+                    <label for="edit_description">Mô tả</label>
+                    <textarea name="description" id="edit_description" placeholder="Nhập mô tả sản phẩm"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="edit_price">Giá</label>
+                    <input type="number" name="price" id="edit_price" placeholder="Nhập giá sản phẩm">
+                </div>
+                <div class="form-group">
+                    <label for="edit_supplier_search">Nhà cung cấp</label>
+                    <input type="hidden" name="supplier_id" id="edit_supplier_id">
+                    <input list="edit_supplier_list" id="edit_supplier_search" placeholder="Tìm hoặc gõ tên nhà cung cấp">
+                    <datalist id="edit_supplier_list">
+                        <?php foreach ($suppliers as $s): ?>
+                            <option value="<?php echo htmlspecialchars($s['name']) ?>"></option>
+                        <?php endforeach; ?>
+                    </datalist>
+                </div>
+                <div class="form-group">
+                    <label for="edit_images">Hình (URL, nhiều cái cách nhau bằng dấu phẩy)</label>
+                    <input type="text" name="images" id="edit_images">
+                </div>
+                <div class="form-group">
+                    <label for="edit_videos">Video (URL, nhiều cái cách nhau bằng dấu phẩy)</label>
+                    <input type="text" name="videos" id="edit_videos">
+                </div>
+                <div class="form-group">
+                    <label for="edit_featured_image">Hình đại diện (URL)</label>
+                    <input type="text" name="featured_image" id="edit_featured_image">
+                </div>
+                <div class="form-group">
+                    <label for="edit_manufacturer">Nhà sản xuất</label>
+                    <input type="text" name="manufacturer" id="edit_manufacturer">
+                </div>
+                <div class="form-group">
+                    <label for="edit_origin">Nơi sản xuất</label>
+                    <input type="text" name="origin" id="edit_origin">
+                </div>
+                <div class="form-group">
+                    <label for="edit_material_type">Loại vật tư</label>
+                    <input type="text" name="material_type" id="edit_material_type">
+                </div>
+                <div class="form-group">
+                    <label for="edit_application">Ứng dụng</label>
+                    <input type="text" name="application" id="edit_application">
+                </div>
+                <div class="form-group">
+                    <label for="edit_product_function">Chức năng</label>
+                    <input type="text" name="product_function" id="edit_product_function">
+                </div>
+                <div class="form-group">
+                    <label>Danh mục cha</label>
+                    <input type="text" id="edit_parent_category_display" class="form-control" readonly style="background: #f5f5f5; color: #666;">
+                </div>
+                <div class="form-group">
+                    <label for="edit_category_id">Danh mục con <span style="color:red">*</span></label>
+                    <select name="category_id" id="edit_category_id" class="form-control" onchange="updateParentCategory(this, 'edit_parent_category_display')" required>
+                        <option value="">-- Chọn danh mục con --</option>
+                        <?php foreach ($categoriesGrouped as $group): ?>
+                            <optgroup label="📁 <?php echo htmlspecialchars($group['main']['name']) ?>">
+                                <?php foreach ($group['subs'] as $sub): ?>
+                                    <option value="<?php echo $sub['id'] ?>"
+                                            data-parent-id="<?php echo $group['main']['id'] ?>"
+                                            data-parent-name="<?php echo htmlspecialchars($group['main']['name']) ?>">
+                                        <?php echo htmlspecialchars($sub['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit_thickness">Độ dày</label>
+                    <input type="text" name="thickness" id="edit_thickness">
+                </div>
+                <div class="form-group">
+                    <label for="edit_color">Màu sắc</label>
+                    <input type="text" name="color" id="edit_color">
+                </div>
+                <div class="form-group">
+                    <label for="edit_warranty">Bảo hành</label>
+                    <input type="text" name="warranty" id="edit_warranty">
+                </div>
+                <div class="form-group">
+                    <label for="edit_stock">Tồn kho</label>
+                    <input type="number" name="stock" id="edit_stock">
+                </div>
+                <div class="form-group">
+                    <label for="edit_classification">Phân loại sản phẩm</label>
+                    <select name="classification[]" id="edit_classification" class="form-control" multiple>
+                        <?php foreach ($productClassifications as $classification): ?>
+                            <option value="<?php echo htmlspecialchars($classification); ?>">
+                                <?php echo htmlspecialchars($classification); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="edit_brand">Thương hiệu</label>
+                    <input type="text" name="brand" id="edit_brand">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" name="status" id="edit_status"> Hoạt động
+                        &nbsp;&nbsp;
+                        <input type="checkbox" name="featured" id="edit_featured"> Nổi bật
+                    </label>
+                </div>
+                <div style="margin-top:12px">
+                    <button class="primary" type="submit" name="save_product">Lưu thay đổi</button>
+                    <button type="button" class="small-btn" onclick="closeEditModal()">Hủy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 <?php require __DIR__ . '/inc/footer.php'; ?>
 
 <script>
+// Hàm cập nhật danh mục cha khi chọn danh mục con
+function updateParentCategory(selectElement, displayId = 'parent_category_display') {
+    const selectedOption = selectElement.options[selectElement.selectedIndex];
+    const parentName = selectedOption.getAttribute('data-parent-name') || '';
+    document.getElementById(displayId).value = parentName;
+}
+
+// Khởi tạo danh mục cha khi trang load
+document.addEventListener('DOMContentLoaded', function() {
+    // Cho form thêm mới
+    const categorySelect = document.getElementById('category_id');
+    if (categorySelect && categorySelect.value) {
+        updateParentCategory(categorySelect);
+    }
+});
+
 // Map supplier names to id and logo
 const suppliers = {
 <?php foreach ($suppliers as $s): ?>
@@ -441,4 +637,105 @@ function updateSupplierFields() {
 
 supplierSearch && supplierSearch.addEventListener('change', updateSupplierFields);
 supplierSearch && supplierSearch.addEventListener('keyup', updateSupplierFields);
+
+// Modal functions
+function openAddModal() {
+    document.getElementById('addModal').style.display = 'block';
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+    document.getElementById('addProductForm').reset();
+}
+
+function openEditModal(id) {
+    // Fetch product data
+    fetch('products.php?action=get&id=' + id)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const product = data.product;
+                
+                // Populate form
+                document.getElementById('edit_id').value = product.id;
+                document.getElementById('edit_name').value = product.name || '';
+                document.getElementById('edit_slug').value = product.slug || '';
+                document.getElementById('edit_description').value = product.description || '';
+                document.getElementById('edit_price').value = product.price || '';
+                document.getElementById('edit_supplier_id').value = product.supplier_id || '';
+                document.getElementById('edit_supplier_search').value = product.supplier_name || '';
+                document.getElementById('edit_images').value = product.images || '';
+                document.getElementById('edit_videos').value = product.videos || '';
+                document.getElementById('edit_featured_image').value = product.featured_image || '';
+                document.getElementById('edit_manufacturer').value = product.manufacturer || '';
+                document.getElementById('edit_origin').value = product.origin || '';
+                document.getElementById('edit_material_type').value = product.material_type || '';
+                document.getElementById('edit_application').value = product.application || '';
+                document.getElementById('edit_product_function').value = product.product_function || '';
+                document.getElementById('edit_category_id').value = product.category_id || '';
+                // Cập nhật danh mục cha
+                const editCategorySelect = document.getElementById('edit_category_id');
+                if (editCategorySelect.value) {
+                    updateParentCategory(editCategorySelect, 'edit_parent_category_display');
+                } else {
+                    document.getElementById('edit_parent_category_display').value = '';
+                }
+                document.getElementById('edit_thickness').value = product.thickness || '';
+                document.getElementById('edit_color').value = product.color || '';
+                document.getElementById('edit_warranty').value = product.warranty || '';
+                document.getElementById('edit_stock').value = product.stock || '';
+                document.getElementById('edit_brand').value = product.brand || '';
+                document.getElementById('edit_status').checked = product.status == 1;
+                document.getElementById('edit_featured').checked = product.featured == 1;
+                
+                // Handle classification (multiple select)
+                const classifications = (product.classification || '').split(',');
+                const editClassification = document.getElementById('edit_classification');
+                for (let option of editClassification.options) {
+                    option.selected = classifications.includes(option.value);
+                }
+                
+                // Show modal
+                document.getElementById('editModal').style.display = 'block';
+            } else {
+                alert('Không thể tải dữ liệu sản phẩm');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Đã xảy ra lỗi khi tải dữ liệu');
+        });
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+
+// Update supplier fields for edit form
+const editSupplierSearch = document.getElementById('edit_supplier_search');
+const editSupplierIdInput = document.getElementById('edit_supplier_id');
+
+function updateEditSupplierFields() {
+    const name = editSupplierSearch.value.trim();
+    if (suppliers[name]) {
+        editSupplierIdInput.value = suppliers[name].id;
+    } else {
+        editSupplierIdInput.value = '';
+    }
+}
+
+editSupplierSearch && editSupplierSearch.addEventListener('change', updateEditSupplierFields);
+editSupplierSearch && editSupplierSearch.addEventListener('keyup', updateEditSupplierFields);
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const addModal = document.getElementById('addModal');
+    const editModal = document.getElementById('editModal');
+    if (event.target == addModal) {
+        closeAddModal();
+    }
+    if (event.target == editModal) {
+        closeEditModal();
+    }
+}
 </script>

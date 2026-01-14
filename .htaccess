@@ -1,0 +1,172 @@
+# VNMaterial - Enhanced Security & URL Rewriting
+# Professional URL structure without .php extension
+
+RewriteEngine On
+
+# Auto-detect RewriteBase (localhost vs production)
+RewriteCond %{REQUEST_URI} ^/vnmt/
+RewriteRule ^(.*)$ - [E=BASE:/vnmt/]
+RewriteCond %{REQUEST_URI} !^/vnmt/
+RewriteRule ^(.*)$ - [E=BASE:/]
+
+# ============================================
+# SECURITY HEADERS
+# ============================================
+
+# Prevent clickjacking
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Content Security Policy (adjust as needed)
+    # Allow Font Awesome from cdnjs.cloudflare.com
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' data: https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self';"
+    
+    # Remove server signature
+    Header always unset X-Powered-By
+    Header unset X-Powered-By
+</IfModule>
+
+# ============================================
+# PROTECT SENSITIVE FILES
+# ============================================
+
+# Block access to sensitive files
+<FilesMatch "^(config\.php|config_production\.php|\.env|\.git|composer\.(json|lock)|package\.json|package-lock\.json|error_log|htaccess|htaccess\.(backup|production))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Block access to backend directory from frontend (optional - uncomment if needed)
+# <IfModule mod_rewrite.c>
+#     RewriteCond %{REQUEST_URI} ^/backend/
+#     RewriteCond %{REMOTE_ADDR} !^127\.0\.0\.1$
+#     RewriteCond %{REMOTE_ADDR} !^::1$
+#     RewriteRule ^backend/ - [F,L]
+# </IfModule>
+
+# Block access to lang files directly (except through PHP)
+<FilesMatch "\.(php|backup|broken_backup)$">
+    <IfModule mod_authz_core.c>
+        <FilesMatch "^(en|vi|auto_.*|translations_.*|TranslationManager)\.php$">
+            Require all denied
+        </FilesMatch>
+    </IfModule>
+</FilesMatch>
+
+# ============================================
+# URL REWRITING - SEO Friendly URLs
+# ============================================
+
+# Route 1: Sản phẩm - /san-pham/{slug-id} hoặc /product/{slug-id}
+RewriteRule ^(san-pham|product)/([a-z0-9\-]+)$ router.php [L,QSA]
+
+# Route 2: Nhà cung cấp - /nha-cung-cap/{slug-id} hoặc /supplier/{slug-id}
+RewriteRule ^(nha-cung-cap|supplier)/([a-z0-9\-]+)$ router.php [L,QSA]
+
+# Route 3: Tin tức - /tin-tuc/{slug-id} hoặc /news/{slug-id}
+RewriteRule ^(tin-tuc|news)/([a-z0-9\-]+)$ router.php [L,QSA]
+
+# IMPORTANT: Allow direct access to .php files with query parameters
+# This ensures product-detail.php?id=123 still works for backward compatibility
+
+# Handle clean URLs (without .php) - add .php extension internally
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}.php -f
+RewriteRule ^(.*)$ $1.php [L,QSA]
+
+# Redirect .php URLs to clean URLs (301 permanent redirect)
+# BUT: Only redirect if there are NO query parameters (or only lang parameter)
+RewriteCond %{THE_REQUEST} \s/+(.+?)\.php[\s?] [NC]
+RewriteCond %{QUERY_STRING} ^$ [OR]
+RewriteCond %{QUERY_STRING} ^lang= [NC]
+RewriteRule ^(.*)\.php$ /$1? [R=301,L]
+
+# Hide index.php from URL (only if no query params or just lang param)
+RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.php[\s?] [NC]
+RewriteCond %{QUERY_STRING} ^$ [OR]
+RewriteCond %{QUERY_STRING} ^lang= [NC]
+RewriteRule ^(.*)index\.php$ /$1? [R=301,L]
+
+# Redirect /en/ URLs to add ?lang=en parameter
+RewriteCond %{REQUEST_URI} /en/(.*)$
+RewriteRule ^en/(.*)$ $1?lang=en [QSA,L]
+
+# ============================================
+# PRODUCTION SETTINGS (uncomment for production)
+# ============================================
+
+# Redirect www to non-www
+# RewriteCond %{HTTP_HOST} ^www\.vnmaterials\.com [NC]
+# RewriteRule ^(.*)$ https://vnmaterials.com/$1 [L,R=301]
+
+# Force HTTPS
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# ============================================
+# ERROR PAGES
+# ============================================
+
+ErrorDocument 404 /404.php
+ErrorDocument 500 /500.php
+
+# ============================================
+# SECURITY SETTINGS
+# ============================================
+
+# Prevent directory listing
+Options -Indexes
+
+# Disable server signature
+ServerSignature Off
+
+# Prevent access to .htaccess files
+<Files .htaccess>
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</Files>
+
+# ============================================
+# PERFORMANCE OPTIMIZATION
+# ============================================
+
+# Enable gzip compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml
+</IfModule>
+
+# Browser caching for static files
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+    ExpiresByType application/pdf "access plus 1 month"
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+</IfModule>
+
+# ============================================
+# UTF-8 ENCODING
+# ============================================
+
+AddDefaultCharset UTF-8

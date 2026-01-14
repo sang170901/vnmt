@@ -1,107 +1,196 @@
-<?php include 'inc/header-new.php'; ?>
-<?php
-require_once 'backend/inc/news_manager.php';
+<?php 
+require_once 'config.php';
+require_once 'lang/lang.php';
+require_once 'lang/db_translate_helper.php';
+require_once 'inc/db_frontend.php';
+require_once 'inc/url_helpers.php';
 
-// Initialize NewsManager
-$newsManager = new NewsManager();
+include 'inc/header-new.php';
+
+$pdo = getFrontendPDO();
 
 // Get filter parameters
 $category = isset($_GET['category']) ? $_GET['category'] : '';
 $search = isset($_GET['search']) ? $_GET['search'] : '';
+$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+$perPage = 9;
 
-// Get news list
-$newsList = $newsManager->getNews($category, $search);
+// Build query
+$where = ["status = 'published'"];
+$params = [];
 
-// Get categories for filter
-$categories = $newsManager->getCategories();
+if (!empty($category)) {
+    $where[] = "category = ?";
+    $params[] = $category;
+}
+
+if (!empty($search)) {
+    $where[] = "(title LIKE ? OR content LIKE ? OR excerpt LIKE ?)";
+    $searchTerm = "%{$search}%";
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+    $params[] = $searchTerm;
+}
+
+$whereClause = implode(' AND ', $where);
+
+// Get total count
+$countSql = "SELECT COUNT(*) as total FROM posts WHERE {$whereClause}";
+$stmt = $pdo->prepare($countSql);
+$stmt->execute($params);
+$total = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+$totalPages = ceil($total / $perPage);
+
+// Get posts with pagination (include English columns)
+$offset = ($page - 1) * $perPage;
+$sql = "SELECT p.*, p.title_en, p.excerpt_en, p.content_en,
+        (SELECT COUNT(*) FROM comments WHERE post_id = p.id AND status = 'approved') as comment_count
+        FROM posts p 
+        WHERE {$whereClause} 
+        ORDER BY published_at DESC, created_at DESC 
+        LIMIT {$perPage} OFFSET {$offset}";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$newsList = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get categories
+$categories = $pdo->query("SELECT DISTINCT category FROM posts WHERE status = 'published' AND category IS NOT NULL AND category != '' ORDER BY category")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 
 <style>
     :root {
-        --primary-color: #4da6ff; /* blue water tone */
-        --primary-600: #3d8ef0;
-        --secondary-color: #eef8ff;
-        --accent-color: #60a5fa;
-        --text-primary: #0f172a;
-        --text-secondary: #475569;
-        --border-color: #dbeeff;
-        --success-color: #10b981;
-        --warning-color: #f59e0b;
+        --primary: #38bdf8;
+        --primary-dark: #0284c7;
+        --primary-light: #e0f2fe;
+        --text-dark: #0f172a;
+        --text-gray: #64748b;
+        --bg-light: #f8fafc;
+        --white: #ffffff;
+        --border: #e2e8f0;
     }
 
-    .news-page {
-        max-width: 1200px;
+    body {
+        background: var(--bg-light);
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .news-container {
+        max-width: 1280px;
         margin: 0 auto;
         padding: 2rem 1rem;
-        font-family: 'Nunito Sans', 'Open Sans', 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
     }
 
-    /* Hero Header */
+    /* Hero Section - Compact */
     .news-hero {
-        background: linear-gradient(135deg, rgba(77,166,255,0.12) 0%, rgba(96,165,250,0.08) 100%);
-        border-radius: 20px;
-        padding: 4rem 2rem;
         text-align: center;
-        color: white;
         margin-bottom: 3rem;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .news-hero::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="white" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="white" opacity="0.1"/><circle cx="50" cy="10" r="0.5" fill="white" opacity="0.1"/><circle cx="20" cy="80" r="0.5" fill="white" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-        pointer-events: none;
+        padding: 2rem 0;
     }
 
     .news-hero h1 {
-        font-size: 2.8rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        text-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        position: relative;
-        z-index: 1;
+        font-size: 3rem;
+        font-weight: 800;
+        color: var(--text-dark);
+        margin: 0 0 0.75rem 0;
     }
 
-    .news-hero .subtitle {
-        font-size: 1.3rem;
-        opacity: 0.9;
-        font-weight: 300;
-        line-height: 1.6;
-        position: relative;
-        z-index: 1;
+    .news-hero p {
+        font-size: 1.32rem;
+        color: var(--text-gray);
+        margin: 0;
     }
 
-    /* Modern Filters */
-    .news-filters {
-        background: white;
+    /* Category Filter Pills */
+    .category-filter {
+        background: var(--white);
         border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 3rem;
-        box-shadow: 0 4px 25px rgba(0,0,0,0.08);
-        border: 1px solid var(--border-color);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    .filter-grid {
-        display: grid;
-        grid-template-columns: 1fr 400px;
-        gap: 2rem;
-        align-items: start;
-    }
-
-    .category-section h3 {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 1rem;
+    .filter-header {
         display: flex;
         align-items: center;
-        gap: 0.5rem;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .filter-title {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--text-gray);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .search-box {
+        position: relative;
+        display: flex;
+        flex: 1;
+        max-width: 400px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        overflow: hidden;
+        background: var(--white);
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 0.875rem 1.25rem;
+        padding-right: 3.5rem;
+        border: 2px solid var(--border);
+        border-radius: 12px;
+        font-size: 0.9375rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        background: var(--white);
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 4px 16px rgba(56, 189, 248, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .search-input::placeholder {
+        color: #94a3b8;
+    }
+
+    .search-btn {
+        position: absolute;
+        right: 4px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        background: var(--primary);
+        color: var(--white);
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .search-btn:hover {
+        background: var(--primary-dark);
+        transform: translateY(-50%) scale(1.05);
+        box-shadow: 0 4px 12px rgba(56, 189, 248, 0.4);
+    }
+
+    .search-btn:active {
+        transform: translateY(-50%) scale(0.95);
+    }
+
+    .search-btn i {
+        font-size: 1rem;
     }
 
     .category-pills {
@@ -111,488 +200,426 @@ $categories = $newsManager->getCategories();
     }
 
     .category-pill {
-        padding: 0.75rem 1.5rem;
-        background: var(--secondary-color);
-        color: var(--text-secondary);
-        border-radius: 50px;
-        text-decoration: none;
-        font-weight: 500;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
+        padding: 0.625rem 1.25rem;
+        background: var(--bg-light);
+        color: var(--text-gray);
         border: 2px solid transparent;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .category-pill::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-        transition: left 0.5s;
-    }
-
-    .category-pill:hover::before {
-        left: 100%;
-    }
-
-    .category-pill:hover,
-    .category-pill.active {
-        background: var(--primary-color);
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
-    }
-
-    .search-section h3 {
-        font-size: 1.1rem;
+        border-radius: 50px;
+        font-size: 0.875rem;
         font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .search-wrapper {
-        position: relative;
-    }
-
-    .search-input {
-        width: 100%;
-        padding: 1rem 1rem 1rem 3rem;
-        border: 2px solid var(--border-color);
-        border-radius: 12px;
-        font-size: 1rem;
-        transition: all 0.3s ease;
-        background: var(--secondary-color);
-    }
-
-    .search-input:focus {
-        outline: none;
-        border-color: var(--primary-color);
-        background: white;
-        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
-    }
-
-    .search-icon {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: var(--text-secondary);
-        font-size: 1.1rem;
-    }
-
-    /* Main Content Grid */
-    .content-grid {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 3rem;
-    }
-
-    /* Article Cards */
-    .articles-section h2 {
-        font-size: 1.6rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        margin-bottom: 2rem;
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-    }
-
-    .article-card {
-        background: white;
-        border-radius: 20px;
-        overflow: hidden;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 25px rgba(0,0,0,0.08);
-        border: 1px solid var(--border-color);
-        transition: all 0.3s ease;
-    }
-
-    .article-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 40px rgba(0,0,0,0.15);
-    }
-
-    .article-image {
-        height: 200px;
-        background: linear-gradient(45deg, #0d9488, #14b8a6);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .article-image::after {
-        content: '📰';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        font-size: 3rem;
-        opacity: 0.3;
-    }
-
-    .article-content {
-        padding: 2rem;
-    }
-
-    .article-meta {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1rem;
-    }
-
-    .article-category {
-        background: var(--primary-color);
-        color: white;
-        padding: 0.4rem 1rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .article-date {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .article-title {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: var(--text-primary);
-        line-height: 1.4;
-        margin-bottom: 1rem;
-    }
-
-    .article-title a {
-        color: inherit;
         text-decoration: none;
-        transition: color 0.3s ease;
-    }
-
-    .article-title a:hover {
-        color: var(--primary-color);
-    }
-
-    .article-excerpt {
-        color: var(--text-secondary);
-        line-height: 1.7;
-        margin-bottom: 1.5rem;
-        font-size: 1rem;
-    }
-
-    .read-more-btn {
+        transition: all 0.2s;
         display: inline-flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
-        background: var(--primary-color);
-        color: white;
+    }
+
+    .category-pill:hover {
+        background: var(--primary-light);
+        color: var(--primary-dark);
+        border-color: var(--primary);
+    }
+
+    .category-pill.active {
+        background: var(--primary);
+        color: var(--white);
+        border-color: var(--primary);
+    }
+
+    .category-pill .count {
+        background: rgba(255,255,255,0.3);
+        padding: 0.125rem 0.5rem;
+        border-radius: 50px;
+        font-size: 0.75rem;
+    }
+
+    .category-pill.active .count {
+        background: rgba(255,255,255,0.3);
+    }
+
+    /* News Grid */
+    .news-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    @media (max-width: 1024px) {
+        .news-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .news-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .filter-header {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .search-box {
+            max-width: 100%;
+        }
+
+        .search-input {
+            font-size: 1rem;
+        }
+    }
+
+    /* News Card */
+    .news-card {
+        background: var(--white);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.3s;
+        display: flex;
+        flex-direction: column;
         text-decoration: none;
-        border-radius: 10px;
+        color: inherit;
+        cursor: pointer;
+    }
+
+    .news-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+    }
+    
+    .news-card:hover .news-card-title {
+        color: var(--primary);
+    }
+
+    .news-card-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .news-card-body {
+        padding: 1.5rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .news-card-category {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: var(--primary-light);
+        color: var(--primary-dark);
+        font-size: 0.75rem;
         font-weight: 600;
-        transition: all 0.3s ease;
-        font-size: 0.9rem;
+        border-radius: 50px;
+        margin-bottom: 0.75rem;
+        width: fit-content;
     }
 
-    .read-more-btn:hover {
-        background: var(--accent-color);
-        transform: translateX(5px);
-    }
-
-    /* Sidebar */
-    .sidebar {
-        position: sticky;
-        top: 2rem;
-        height: fit-content;
-    }
-
-    .sidebar-widget {
-        background: white;
-        border-radius: 16px;
-        padding: 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 4px 25px rgba(0,0,0,0.08);
-        border: 1px solid var(--border-color);
-    }
-
-    .widget-title {
-        font-size: 1.3rem;
+    .news-card-title {
+        font-size: 1.125rem;
         font-weight: 700;
-        color: var(--text-primary);
-        margin-bottom: 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
+        color: var(--text-dark);
+        margin: 0 0 0.75rem 0;
+        line-height: 1.4;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
 
-    .recent-item {
-        display: flex;
-        gap: 1rem;
-        padding: 1rem 0;
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    .recent-item:last-child {
-        border-bottom: none;
-    }
-
-    .recent-image {
-        width: 60px;
-        height: 60px;
-        border-radius: 10px;
-        background: linear-gradient(45deg, var(--primary-color), var(--accent-color));
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 1.2rem;
-        flex-shrink: 0;
-    }
-
-    .recent-content {
+    .news-card-excerpt {
+        font-size: 0.875rem;
+        color: var(--text-gray);
+        line-height: 1.6;
+        margin-bottom: 1rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
         flex: 1;
     }
 
-    .recent-title {
+    .news-card-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
+    }
+
+    .news-card-meta {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--text-gray);
+    }
+
+    .news-card-link {
+        color: var(--primary);
         font-weight: 600;
-        font-size: 0.9rem;
-        line-height: 1.4;
-        margin-bottom: 0.5rem;
-    }
-
-    .recent-title a {
-        color: var(--text-primary);
+        font-size: 0.875rem;
         text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        transition: all 0.2s;
     }
 
-    .recent-title a:hover {
-        color: var(--primary-color);
+    .news-card-link:hover {
+        color: var(--primary-dark);
+        gap: 0.5rem;
     }
 
-    .recent-meta {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-    }
-
-    /* Stats Widget */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .stat-item {
+    /* Empty State */
+    .empty-state {
         text-align: center;
-        padding: 1rem;
-        background: var(--secondary-color);
+        padding: 4rem 2rem;
+        background: var(--white);
         border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
-    .stat-number {
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.3;
+    }
+
+    .empty-state h3 {
         font-size: 1.5rem;
+        color: var(--text-dark);
+        margin: 0 0 0.5rem 0;
+    }
+
+    .empty-state p {
+        color: var(--text-gray);
+        margin: 0;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 3rem;
+    }
+
+    .pagination-btn {
+        padding: 0.625rem 1rem;
+        background: var(--white);
+        color: var(--text-gray);
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.2s;
+        font-size: 0.875rem;
+    }
+
+    .pagination-btn:hover:not(.disabled) {
+        background: var(--primary-light);
+        color: var(--primary-dark);
+        border-color: var(--primary);
+    }
+
+    .pagination-btn.active {
+        background: var(--primary);
+        color: var(--white);
+        border-color: var(--primary);
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    /* Results Info */
+    .results-info {
+        text-align: center;
+        color: var(--text-gray);
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .results-info strong {
+        color: var(--primary-dark);
         font-weight: 700;
-        color: var(--primary-color);
-    }
-
-    .stat-label {
-        font-size: 0.8rem;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    /* Responsive */
-    @media (max-width: 1024px) {
-        .content-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .sidebar {
-            position: static;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .news-page {
-            padding: 1rem 0.5rem;
-        }
-
-        .news-hero {
-            padding: 2rem 1rem;
-        }
-
-        .news-hero h1 {
-            font-size: 2.2rem;
-        }
-
-        .filter-grid {
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
-        }
-
-        .category-pills {
-            justify-content: center;
-        }
-
-        .article-content {
-            padding: 1.5rem;
-        }
-
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
     }
 </style>
 
-<div class="news-page">
-    <!-- Hero Header -->
+<div class="news-container">
+    <!-- Hero -->
     <div class="news-hero">
-        <h1>📰 Bản Tin Vật Tư</h1>
-        <p class="subtitle">Cập nhật thông tin mới nhất về vật liệu xây dựng, công nghệ và xu hướng thị trường</p>
+        <h1>📰 Tin Tức & Bài Viết</h1>
+        <p>Cập nhật tin tức mới nhất về vật liệu xây dựng, công nghệ và xu hướng ngành</p>
     </div>
 
-    <!-- Modern Filters -->
-    <div class="news-filters">
-        <div class="filter-grid">
-            <div class="category-section">
-                <h3><i class="fas fa-layer-group"></i> Danh mục tin tức</h3>
-                <div class="category-pills">
-                    <a href="news-modern.php" class="category-pill <?php echo empty($category) ? 'active' : ''; ?>">
-                        Tất cả
-                    </a>
-                    <?php foreach ($categories as $cat): ?>
-                        <a href="news-modern.php?category=<?php echo urlencode($cat); ?>" 
-                           class="category-pill <?php echo $category === $cat ? 'active' : ''; ?>">
-                            <?php echo htmlspecialchars($cat); ?>
-                        </a>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            
-            <div class="search-section">
-                <h3><i class="fas fa-search"></i> Tìm kiếm bài viết</h3>
-                <div class="search-wrapper">
-                    <i class="fas fa-search search-icon"></i>
-                    <input type="text" 
-                           class="search-input"
-                           placeholder="Nhập từ khóa..." 
-                           value="<?php echo htmlspecialchars($search); ?>"
-                           onkeypress="if(event.key==='Enter') window.location.href='news-modern.php?search='+encodeURIComponent(this.value)">
-                </div>
-            </div>
+    <!-- Category Filter -->
+    <div class="category-filter">
+        <div class="filter-header">
+            <span class="filter-title">🏷️ Danh mục</span>
+            <form method="GET" action="" class="search-box">
+                <input type="text" 
+                       name="search" 
+                       class="search-input" 
+                       placeholder="Tìm kiếm bài viết..." 
+                       value="<?php echo htmlspecialchars($search); ?>">
+                <button type="submit" class="search-btn" title="Tìm kiếm">
+                    <i class="fas fa-search"></i>
+                </button>
+            </form>
         </div>
-    </div>
 
-    <!-- Main Content Grid -->
-    <div class="content-grid">
-        <!-- Articles Section -->
-        <div class="articles-section">
-            <h2><i class="fas fa-newspaper"></i> Bài viết mới nhất</h2>
+        <div class="category-pills">
+            <a href="news-modern.php" class="category-pill <?php echo empty($category) ? 'active' : ''; ?>">
+                <i class="fas fa-th"></i>
+                <span>Tất cả</span>
+                <span class="count"><?php echo $total; ?></span>
+            </a>
+            <?php 
+            // Count posts per category
+            $categoryCounts = [];
+            $stmt = $pdo->query("SELECT category, COUNT(*) as count FROM posts WHERE status = 'published' AND category IS NOT NULL AND category != '' GROUP BY category");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $categoryCounts[$row['category']] = $row['count'];
+            }
             
-            <?php foreach ($newsList as $news): ?>
-            <article class="article-card">
-                <div class="article-image"></div>
-                <div class="article-content">
-                    <div class="article-meta">
-                        <span class="article-category"><?php echo $news['category']; ?></span>
-                        <span class="article-date">
-                            <i class="fas fa-calendar-alt"></i>
-                            <?php echo date('d/m/Y', strtotime($news['published_date'])); ?>
-                        </span>
-                    </div>
-                    
-                    <h3 class="article-title">
-                        <a href="article-detail.php?slug=<?php echo $news['slug']; ?>">
-                            <?php echo htmlspecialchars($news['title']); ?>
-                        </a>
-                    </h3>
-                    
-                    <p class="article-excerpt">
-                        <?php echo htmlspecialchars($news['excerpt']); ?>
-                    </p>
-                    
-                    <a href="article-detail.php?slug=<?php echo $news['slug']; ?>" class="read-more-btn">
-                        Đọc tiếp <i class="fas fa-arrow-right"></i>
-                    </a>
-                </div>
-            </article>
+            foreach ($categories as $cat): 
+                if (empty($cat)) continue;
+                $count = isset($categoryCounts[$cat]) ? $categoryCounts[$cat] : 0;
+            ?>
+            <a href="news-modern.php?category=<?php echo urlencode($cat); ?>" 
+               class="category-pill <?php echo $category === $cat ? 'active' : ''; ?>">
+                <span><?php echo htmlspecialchars($cat); ?></span>
+                <span class="count"><?php echo $count; ?></span>
+            </a>
             <?php endforeach; ?>
         </div>
-
-        <!-- Sidebar -->
-        <div class="sidebar">
-            <!-- Recent Posts Widget -->
-            <div class="sidebar-widget">
-                <h3 class="widget-title">
-                    <i class="fas fa-clock"></i> Bài viết gần đây
-                </h3>
-                
-                <?php 
-                $recentNews = array_slice($newsList, 0, 4);
-                foreach ($recentNews as $recent): 
-                ?>
-                <div class="recent-item">
-                    <div class="recent-image">
-                        📝
-                    </div>
-                    <div class="recent-content">
-                        <div class="recent-title">
-                            <a href="article-detail.php?slug=<?php echo $recent['slug']; ?>">
-                                <?php echo htmlspecialchars($recent['title']); ?>
-                            </a>
-                        </div>
-                        <div class="recent-meta">
-                            <?php echo date('d/m/Y', strtotime($recent['published_date'])); ?>
-                        </div>
-                    </div>
-                </div>
-                <?php endforeach; ?>
-            </div>
-
-            <!-- Stats Widget -->
-            <div class="sidebar-widget">
-                <h3 class="widget-title">
-                    <i class="fas fa-chart-line"></i> Thống kê
-                </h3>
-                
-                <div class="stats-grid">
-                    <div class="stat-item">
-                        <div class="stat-number"><?php echo count($categories); ?></div>
-                        <div class="stat-label">Danh mục</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Categories Widget -->
-            <div class="sidebar-widget">
-                <h3 class="widget-title">
-                    <i class="fas fa-tags"></i> Danh mục
-                </h3>
-                
-                <?php foreach ($categories as $cat): ?>
-                <div style="margin-bottom: 0.5rem;">
-                    <a href="news-modern.php?category=<?php echo urlencode($cat); ?>" 
-                       style="color: var(--text-secondary); text-decoration: none; font-size: 0.9rem;">
-                        <i class="fas fa-tag" style="margin-right: 0.5rem; color: var(--primary-color);"></i>
-                        <?php echo htmlspecialchars($cat); ?>
-                    </a>
-                </div>
-                <?php endforeach; ?>
-            </div>
-        </div>
     </div>
+
+    <!-- Results Info -->
+    <?php if (!empty($search) || !empty($category)): ?>
+    <div class="results-info">
+        Tìm thấy <strong><?php echo $total; ?> bài viết</strong>
+        <?php if (!empty($category)): ?>
+            trong danh mục <strong><?php echo htmlspecialchars($category); ?></strong>
+        <?php endif; ?>
+        <?php if (!empty($search)): ?>
+            với từ khóa "<strong><?php echo htmlspecialchars($search); ?></strong>"
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <!-- News Grid -->
+    <?php if (!empty($newsList)): ?>
+    <div class="news-grid">
+        <?php foreach ($newsList as $news): ?>
+        <a href="<?php echo buildArticleUrl($news); ?>" class="news-card">
+            <?php if($news['featured_image']): ?>
+            <img src="<?php echo htmlspecialchars($news['featured_image']); ?>" 
+                 alt="<?php echo htmlspecialchars(getTranslatedTitle($news)); ?>"
+                 class="news-card-image"
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22400%22 height=%22200%22%3E%3Crect fill=%22%2338bdf8%22 width=%22400%22 height=%22200%22/%3E%3Ctext fill=%22%23ffffff%22 font-family=%22Arial%22 font-size=%2220%22 text-anchor=%22middle%22 x=%22200%22 y=%22100%22%3EBài viết%3C/text%3E%3C/svg%3E'">
+            <?php else: ?>
+            <div class="news-card-image" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: 700;">
+                <?php echo htmlspecialchars(mb_substr(getTranslatedTitle($news), 0, 30)); ?>
+            </div>
+            <?php endif; ?>
+            
+            <div class="news-card-body">
+                <?php if($news['category']): ?>
+                <span class="news-card-category">
+                    <?php echo htmlspecialchars($news['category']); ?>
+                </span>
+                <?php endif; ?>
+                
+                <h2 class="news-card-title">
+                    <?php echo htmlspecialchars(getTranslatedTitle($news)); ?>
+                </h2>
+                
+                <p class="news-card-excerpt">
+                    <?php echo htmlspecialchars(getTranslatedExcerpt($news)); ?>
+                </p>
+                
+                <div class="news-card-footer">
+                    <div class="news-card-meta">
+                        <i class="far fa-calendar"></i>
+                        <span><?php echo date('d/m/Y', strtotime($news['published_at'] ?? $news['created_at'])); ?></span>
+                        <span>•</span>
+                        <i class="far fa-comments"></i>
+                        <span><?php echo $news['comment_count'] ?? 0; ?> bình luận</span>
+                    </div>
+                    
+                    <span class="news-card-link">
+                        Đọc thêm <i class="fas fa-arrow-right"></i>
+                    </span>
+                </div>
+            </div>
+        </a>
+        <?php endforeach; ?>
+    </div>
+
+    <!-- Pagination -->
+    <?php if ($totalPages > 1): ?>
+    <div class="pagination">
+        <!-- Previous -->
+        <?php if ($page > 1): ?>
+            <a href="?page=<?php echo ($page - 1); ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>" 
+               class="pagination-btn">
+                <i class="fas fa-chevron-left"></i> Trước
+            </a>
+        <?php else: ?>
+            <span class="pagination-btn disabled">
+                <i class="fas fa-chevron-left"></i> Trước
+            </span>
+        <?php endif; ?>
+
+        <!-- Page Numbers -->
+        <?php 
+        $start = max(1, $page - 2);
+        $end = min($totalPages, $page + 2);
+        
+        for ($i = $start; $i <= $end; $i++): 
+        ?>
+            <a href="?page=<?php echo $i; ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>" 
+               class="pagination-btn <?php echo $i === $page ? 'active' : ''; ?>">
+                <?php echo $i; ?>
+            </a>
+        <?php endfor; ?>
+
+        <!-- Next -->
+        <?php if ($page < $totalPages): ?>
+            <a href="?page=<?php echo ($page + 1); ?><?php echo !empty($category) ? '&category=' . urlencode($category) : ''; ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>" 
+               class="pagination-btn">
+                Sau <i class="fas fa-chevron-right"></i>
+            </a>
+        <?php else: ?>
+            <span class="pagination-btn disabled">
+                Sau <i class="fas fa-chevron-right"></i>
+            </span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php else: ?>
+    <!-- Empty State -->
+    <div class="empty-state">
+        <div class="empty-state-icon">🔍</div>
+        <h3>Không tìm thấy bài viết</h3>
+        <p>Thử tìm kiếm với từ khóa khác hoặc chọn danh mục khác</p>
+        <?php if (!empty($search) || !empty($category)): ?>
+        <a href="news-modern.php" class="search-btn" style="margin-top: 1.5rem; display: inline-block; text-decoration: none;">
+            <i class="fas fa-redo"></i> Xem tất cả bài viết
+        </a>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php include 'inc/footer-new.php'; ?>

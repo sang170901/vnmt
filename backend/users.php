@@ -32,13 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $newId = $pdo->lastInsertId();
                 log_activity($_SESSION['user']['id'] ?? null, 'create_user', 'user', $newId, json_encode(['name'=>$name,'email'=>$email]));
             }
-            $flash['type'] = 'success';
-            $flash['message'] = 'Saved successfully.';
-            // refresh to show list & message
-            header('Location: users.php?msg=' . urlencode($flash['message']) . '&t=success');
+            header('Location: users.php?msg=' . urlencode('Lưu thành công') . '&t=success');
             exit;
         } catch (PDOException $e) {
-            // handle unique constraint (email) for SQLite: SQLSTATE[23000]
+            // handle unique constraint (email)
             if ($e->getCode() === '23000' || strpos($e->getMessage(), 'UNIQUE') !== false) {
                 $flash['type'] = 'error';
                 $flash['message'] = 'Email đã tồn tại.';
@@ -57,9 +54,8 @@ if ($action === 'delete' && $id) {
     try {
         $stmt = $pdo->prepare('DELETE FROM users WHERE id = ?');
         $stmt->execute([$id]);
-        // log activity
         log_activity($_SESSION['user']['id'] ?? null, 'delete_user', 'user', $id, null);
-        header('Location: users.php?msg=' . urlencode('Deleted') . '&t=success');
+        header('Location: users.php?msg=' . urlencode('Đã xóa') . '&t=success');
         exit;
     } catch (PDOException $e) {
         $flash['type'] = 'error';
@@ -73,7 +69,7 @@ if ($action === 'toggle' && $id) {
         $stmt = $pdo->prepare('UPDATE users SET status = 1 - status WHERE id = ?');
         $stmt->execute([$id]);
         log_activity($_SESSION['user']['id'] ?? null, 'toggle_user_status', 'user', $id, null);
-        header('Location: users.php?msg=' . urlencode('Updated') . '&t=success');
+        header('Location: users.php');
         exit;
     } catch (PDOException $e) {
         $flash['type'] = 'error';
@@ -81,18 +77,33 @@ if ($action === 'toggle' && $id) {
     }
 }
 
+// Get user data for AJAX (JSON)
+if ($action === 'get' && $id) {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($user) {
+            // Don't send password to frontend
+            unset($user['password']);
+            echo json_encode(['success' => true, 'user' => $user]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Không tìm thấy user']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 require __DIR__ . '/inc/header.php';
 
 // Show flash message from redirect
 if (isset($_GET['msg'])) {
-    $flash['message'] = urldecode($_GET['msg']);
+    $flash['message'] = $_GET['msg'];
     $flash['type'] = $_GET['t'] ?? 'success';
-}
-
-if ($action === 'edit' && $id) {
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
-    $stmt->execute([$id]);
-    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 // Fetch users (with optional search)
@@ -107,27 +118,32 @@ if (!empty($search)) {
 
 ?>
 <div class="card">
-    <h2 class="page-main-title">Users</h2>
+    <h2 class="page-main-title">Quản lý Khách hàng/Users</h2>
+    
     <?php if (!empty($flash['message'])): ?>
-        <div class="flash <?php echo $flash['type'] === 'success' ? 'success' : 'error' ?>"><?php echo htmlspecialchars($flash['message']) ?></div>
+        <div class="flash <?php echo $flash['type'] === 'success' ? 'success' : 'error' ?>">
+            <?php echo htmlspecialchars($flash['message']) ?>
+        </div>
     <?php endif; ?>
+    
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-        <a class="small-btn primary" href="users.php?action=add">+ Add User</a>
+        <button class="small-btn primary" onclick="openAddModal()">+ Thêm User</button>
         <form method="get" action="users.php" style="margin:0">
             <input type="text" name="q" placeholder="Tìm email hoặc tên" value="<?php echo htmlspecialchars($search ?? '') ?>" style="padding:8px;border-radius:6px;border:1px solid #e6e9ef">
             <button class="small-btn" type="submit">Tìm</button>
         </form>
     </div>
+    
     <table class="table">
         <thead>
             <tr>
                 <th>ID</th>
-                <th>Name</th>
+                <th>Tên</th>
                 <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
+                <th>Vai trò</th>
+                <th>Trạng thái</th>
+                <th>Ngày tạo</th>
+                <th>Hành động</th>
             </tr>
         </thead>
         <tbody>
@@ -136,47 +152,169 @@ if (!empty($search)) {
                 <td><?php echo $u['id'] ?></td>
                 <td><?php echo htmlspecialchars($u['name']) ?></td>
                 <td><?php echo htmlspecialchars($u['email']) ?></td>
-                <td><?php echo $u['role'] ?></td>
-                <td><?php echo $u['status'] ? 'Active' : 'Inactive' ?> <a class="small-btn" href="users.php?action=toggle&id=<?php echo $u['id'] ?>">Toggle</a></td>
+                <td><?php echo $u['role'] == 'admin' ? '<span style="color:#f59e0b;font-weight:600;">Admin</span>' : 'User' ?></td>
+                <td>
+                    <a href="users.php?action=toggle&id=<?php echo $u['id'] ?>" style="text-decoration:none;">
+                        <?php echo $u['status'] ? '<span style="color:green;font-weight:600;">✓ Active</span>' : '<span style="color:red;font-weight:600;">✗ Inactive</span>' ?>
+                    </a>
+                </td>
                 <td><?php echo $u['created_at'] ?></td>
                 <td class="btn-row">
-                    <a class="small-btn" href="users.php?action=edit&id=<?php echo $u['id'] ?>">Edit</a>
-                    <a class="small-btn warn" href="users.php?action=delete&id=<?php echo $u['id'] ?>" onclick="return confirm('Delete user?')">Delete</a>
+                    <button class="small-btn" onclick="openEditModal(<?php echo $u['id'] ?>)">Sửa</button>
+                    <a class="small-btn warn" href="users.php?action=delete&id=<?php echo $u['id'] ?>" onclick="return confirm('Xóa user này?')">Xóa</a>
                 </td>
             </tr>
         <?php endforeach; ?>
+        <?php if(empty($users)): ?>
+            <tr>
+                <td colspan="7" style="text-align:center;color:#999;padding:40px;">
+                    Chưa có user nào. Nhấn "Thêm User" để bắt đầu.
+                </td>
+            </tr>
+        <?php endif; ?>
         </tbody>
     </table>
 </div>
 
-<?php if ($action === 'add' || $action === 'edit'): ?>
-<div class="card">
-    <h3 style="margin-top:0"><?php echo $action === 'edit' ? 'Edit User' : 'Add User' ?></h3>
-    <?php if (!empty($flash['message']) && $flash['type'] === 'error'): ?>
-        <div class="flash error"><?php echo htmlspecialchars($flash['message']) ?></div>
-    <?php endif; ?>
-    <form method="post">
-        <label>Name
-            <input type="text" name="name" required value="<?php echo isset($user['name']) ? htmlspecialchars($user['name']) : '' ?>">
-        </label>
-        <label>Email
-            <input type="email" name="email" required value="<?php echo isset($user['email']) ? htmlspecialchars($user['email']) : '' ?>">
-        </label>
-        <label>Role
-            <select name="role">
-                <option value="user" <?php echo (isset($user['role']) && $user['role'] === 'user') ? 'selected' : '' ?>>User</option>
-                <option value="admin" <?php echo (isset($user['role']) && $user['role'] === 'admin') ? 'selected' : '' ?>>Admin</option>
-            </select>
-        </label>
-        <label>Password (leave blank to keep)
-            <input type="password" name="password">
-        </label>
-        <div style="margin-top:12px">
-            <button class="primary" type="submit" name="save_user">Save</button>
-            <a class="small-btn" href="users.php" style="margin-left:12px">Cancel</a>
+<!-- Modal Thêm User -->
+<div id="addModal" class="modal">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header">
+            <h3 style="margin:0">Thêm User Mới</h3>
+            <span class="modal-close" onclick="closeAddModal()">&times;</span>
         </div>
-    </form>
+        <div class="modal-body">
+            <form method="post" id="addUserForm">
+                <label>Tên <span style="color:red">*</span>
+                    <input type="text" name="name" id="add_name" required style="width:100%">
+                </label>
+
+                <label style="margin-top:16px;">Email <span style="color:red">*</span>
+                    <input type="email" name="email" id="add_email" required style="width:100%">
+                </label>
+
+                <label style="margin-top:16px;">Mật khẩu <span style="color:red">*</span>
+                    <input type="password" name="password" id="add_password" required style="width:100%">
+                    <small style="color:#666;display:block;margin-top:5px;">
+                        Mật khẩu mặc định: changeme
+                    </small>
+                </label>
+
+                <label style="margin-top:16px;">Vai trò
+                    <select name="role" id="add_role" style="width:100%">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </label>
+
+                <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end">
+                    <button type="button" class="small-btn" onclick="closeAddModal()">Hủy</button>
+                    <button type="submit" class="small-btn primary" name="save_user">💾 Thêm user</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
-<?php endif; ?>
+
+<!-- Modal Sửa User -->
+<div id="editModal" class="modal">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header">
+            <h3 style="margin:0">Chỉnh Sửa User</h3>
+            <span class="modal-close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form method="post" id="editUserForm" action="users.php?action=edit&id=">
+                <label>Tên <span style="color:red">*</span>
+                    <input type="text" name="name" id="edit_name" required style="width:100%">
+                </label>
+
+                <label style="margin-top:16px;">Email <span style="color:red">*</span>
+                    <input type="email" name="email" id="edit_email" required style="width:100%">
+                </label>
+
+                <label style="margin-top:16px;">Mật khẩu mới (để trống nếu không đổi)
+                    <input type="password" name="password" id="edit_password" style="width:100%">
+                    <small style="color:#666;display:block;margin-top:5px;">
+                        Chỉ điền nếu muốn thay đổi mật khẩu
+                    </small>
+                </label>
+
+                <label style="margin-top:16px;">Vai trò
+                    <select name="role" id="edit_role" style="width:100%">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </label>
+
+                <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end">
+                    <button type="button" class="small-btn" onclick="closeEditModal()">Hủy</button>
+                    <button type="submit" class="small-btn primary" name="save_user">💾 Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('addUserForm').reset();
+    document.getElementById('add_password').value = 'changeme';
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function openEditModal(userId) {
+    document.getElementById('editModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    document.getElementById('editUserForm').action = 'users.php?action=edit&id=' + userId;
+    
+    fetch('users.php?action=get&id=' + userId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const u = data.user;
+                document.getElementById('edit_name').value = u.name || '';
+                document.getElementById('edit_email').value = u.email || '';
+                document.getElementById('edit_password').value = '';
+                document.getElementById('edit_role').value = u.role || 'user';
+            } else {
+                alert('Không thể tải thông tin user!');
+                closeEditModal();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Lỗi khi tải dữ liệu!');
+            closeEditModal();
+        });
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+window.onclick = function(event) {
+    const addModal = document.getElementById('addModal');
+    const editModal = document.getElementById('editModal');
+    
+    if (event.target == addModal) closeAddModal();
+    if (event.target == editModal) closeEditModal();
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeAddModal();
+        closeEditModal();
+    }
+});
+</script>
 
 <?php require __DIR__ . '/inc/footer.php'; ?>

@@ -1,9 +1,12 @@
 <?php
 header('Content-Type: text/html; charset=UTF-8');
 
+require_once 'config.php';
 require_once 'lang/lang.php';
 require_once 'lang/db_translate_helper.php';
 require_once 'inc/db_frontend.php';
+require_once 'inc/supplier_helpers.php';
+require_once 'inc/url_helpers.php';
 
 // Get product ID from URL
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -30,10 +33,94 @@ $stmt = $pdo->prepare("
 $stmt->execute([$id]);
 $product = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // DEBUG: Log product info
+    error_log("Product ID: $id, Name: " . ($product['name'] ?? 'N/A') . ", Collection ID: " . ($product['collection_id'] ?? 'NULL'));
+
 if (!$product) {
     header('Location: products.php');
     exit;
 }
+    
+    // LẤY SẢN PHẨM CON từ bảng product_items (BẢNG ĐƠN GIẢN)
+    $productItems = [];
+    
+    // Cách 1: Lấy từ product_items (bảng đơn giản mới)
+    try {
+        $itemsStmt = $pdo->prepare("
+            SELECT * FROM product_items 
+            WHERE product_id = ? AND status = 1
+            ORDER BY display_order ASC, id ASC
+        ");
+        $itemsStmt->execute([$id]);
+        $productItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Found " . count($productItems) . " items from product_items table for product ID: $id");
+    } catch (Exception $e) {
+        error_log("Error loading product_items: " . $e->getMessage());
+        
+        // Fallback: Thử lấy từ product_collection_items (cách cũ)
+        if (!empty($product['collection_id'])) {
+            try {
+                $itemsStmt = $pdo->prepare("
+                    SELECT * FROM product_collection_items 
+                    WHERE collection_id = ? 
+                    ORDER BY display_order ASC, id ASC
+                ");
+                $itemsStmt->execute([$product['collection_id']]);
+                $productItems = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
+                error_log("Found " . count($productItems) . " items from collection_id: " . $product['collection_id']);
+            } catch (Exception $e2) {
+                error_log("Error loading collection items: " . $e2->getMessage());
+            }
+        }
+    }
+    
+    // FINAL DEBUG
+    error_log("FINAL: Product Items count: " . count($productItems) . " for product ID: $id");
+    
+    // LẤY FILES/CATALOGUE CỦA SẢN PHẨM MẸ từ product_files
+    $productFiles = [];
+    try {
+        $filesStmt = $pdo->prepare("
+            SELECT * FROM product_files 
+            WHERE product_id = ? AND status = 1
+            ORDER BY display_order ASC, id ASC
+        ");
+        $filesStmt->execute([$id]);
+        $productFiles = $filesStmt->fetchAll(PDO::FETCH_ASSOC);
+        error_log("Found " . count($productFiles) . " files for product ID: $id");
+    } catch (Exception $e) {
+        error_log("Error loading product_files: " . $e->getMessage());
+    }
+    
+    // LẤY FILES CỦA TỪNG ITEM (2D, 3D, TDS) từ product_item_files
+    $itemFilesMap = []; // Map: item_id => array of files
+    if (!empty($productItems)) {
+        $itemIds = array_column($productItems, 'id');
+        if (!empty($itemIds)) {
+            try {
+                $placeholders = implode(',', array_fill(0, count($itemIds), '?'));
+                $itemFilesStmt = $pdo->prepare("
+                    SELECT * FROM product_item_files 
+                    WHERE product_item_id IN ($placeholders) AND status = 1
+                    ORDER BY product_item_id ASC, display_order ASC, id ASC
+                ");
+                $itemFilesStmt->execute($itemIds);
+                $allItemFiles = $itemFilesStmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Group files by item_id
+                foreach ($allItemFiles as $file) {
+                    $itemId = $file['product_item_id'];
+                    if (!isset($itemFilesMap[$itemId])) {
+                        $itemFilesMap[$itemId] = [];
+                    }
+                    $itemFilesMap[$itemId][] = $file;
+                }
+                error_log("Found files for " . count($itemFilesMap) . " items");
+            } catch (Exception $e) {
+                error_log("Error loading product_item_files: " . $e->getMessage());
+            }
+        }
+    }
     
     // Get products from same supplier
     $supplierProducts = [];
@@ -66,17 +153,27 @@ $relatedProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Parse classification for display
 $classifications = !empty($product['classification']) ? explode(',', $product['classification']) : [];
 
-// Parse images (comma-separated URLs)
+// Parse images (comma-separated URLs) - ƯU TIÊN FEATURED_IMAGE
 $imageUrls = [];
-if (!empty($product['images'])) {
-    $imageUrls = array_filter(array_map('trim', explode(',', $product['images'])));
-}
-// Add featured_image to the beginning if exists
+
+// ƯU TIÊN: Thêm featured_image đầu tiên (ảnh đại diện)
 if (!empty($product['featured_image'])) {
-    array_unshift($imageUrls, $product['featured_image']);
+    $imageUrls[] = $product['featured_image'];
 }
-// Remove duplicates
-$imageUrls = array_unique($imageUrls);
+
+// Thêm các images khác (nếu có)
+if (!empty($product['images'])) {
+    $additionalImages = array_filter(array_map('trim', explode(',', $product['images'])));
+    foreach ($additionalImages as $img) {
+        // Không thêm nếu đã có trong featured_image
+        if ($img !== $product['featured_image'] && !empty($img)) {
+            $imageUrls[] = $img;
+}
+    }
+}
+
+// Remove duplicates và empty values
+$imageUrls = array_values(array_unique(array_filter($imageUrls)));
 
 // Parse videos (comma-separated URLs)
 $videoUrls = [];
@@ -174,10 +271,21 @@ include __DIR__ . '/inc/header-new.php';
         
         .product-image {
             width: 100%;
-            height: 450px;
-            object-fit: cover;
+            max-width: 100%;
+            height: auto;
+            max-height: 600px;
+            object-fit: contain;
             border-radius: 12px;
             background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+        }
+        
+        .main-display {
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
+            border-radius: 12px;
         }
         
         .product-badge {
@@ -438,6 +546,21 @@ include __DIR__ . '/inc/header-new.php';
             margin-bottom: 1rem;
         }
         
+        /* Giới hạn chiều ngang của hình ảnh trong mô tả sản phẩm */
+        .tab-content img {
+            max-width: 100%;
+            height: auto !important;
+            width: auto !important;
+            display: block;
+            margin: 1.5rem auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-content p img {
+            margin: 1.5rem auto;
+        }
+        
         .specs-table {
             width: 100%;
             border-collapse: collapse;
@@ -544,6 +667,7 @@ include __DIR__ . '/inc/header-new.php';
             display: flex;
             align-items: center;
             gap: 0.75rem;
+            flex-wrap: wrap;
         }
         
         .section-title i {
@@ -554,6 +678,7 @@ include __DIR__ . '/inc/header-new.php';
             color: #0284c7;
             text-decoration: none;
             transition: color 0.3s;
+            word-break: break-word;
         }
         
         .section-title a:hover {
@@ -781,6 +906,23 @@ include __DIR__ . '/inc/header-new.php';
                 grid-template-columns: 1fr;
             }
             
+            .product-image {
+                max-height: 450px;
+                height: auto;
+            }
+            
+            .main-display {
+                min-height: 250px;
+            }
+            
+            .thumbnail {
+                height: 70px;
+            }
+            
+            .image-thumbnails {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            }
+            
             .product-card {
                 flex: 0 0 260px;
                 min-width: 260px;
@@ -794,7 +936,7 @@ include __DIR__ . '/inc/header-new.php';
             }
             
             .section-title {
-                font-size: 1.5rem;
+                font-size: 1.3rem;
             }
             
             .scroll-nav-btn {
@@ -815,6 +957,25 @@ include __DIR__ . '/inc/header-new.php';
             .page-container {
                 padding: 0 15px;
                 margin-top: 50px;
+            }
+            
+            .product-image {
+                max-height: 350px;
+                height: auto;
+            }
+            
+            .main-display {
+                min-height: 200px;
+            }
+            
+            .thumbnail {
+                height: 60px;
+            }
+            
+            .image-thumbnails {
+                grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+                gap: 8px;
+                margin-top: 10px;
             }
             
             .product-title {
@@ -847,7 +1008,11 @@ include __DIR__ . '/inc/header-new.php';
             }
             
             .section-title {
-                font-size: 1.25rem;
+                font-size: 1rem;
+            }
+            
+            .section-title i {
+                font-size: 0.9rem;
             }
             
             .scroll-nav-btn {
@@ -962,7 +1127,13 @@ include __DIR__ . '/inc/header-new.php';
                         <?php if (!empty($imageUrls)): ?>
                             <img src="<?php echo htmlspecialchars($imageUrls[0]) ?>" 
                                  alt="<?php echo htmlspecialchars(getTranslatedName($product)) ?>" 
-                                 class="product-image" id="mainImage">
+                                 class="product-image" id="mainImage"
+                                 onerror="this.onerror=null; this.src='assets/images/products/default.jpg';">
+                        <?php elseif (!empty($product['featured_image'])): ?>
+                            <img src="<?php echo htmlspecialchars($product['featured_image']) ?>" 
+                                 alt="<?php echo htmlspecialchars(getTranslatedName($product)) ?>" 
+                                 class="product-image" id="mainImage"
+                                 onerror="this.onerror=null; this.src='assets/images/products/default.jpg';">
                         <?php else: ?>
                             <div class="product-image" style="display: flex; align-items: center; justify-content: center;">
                                 <i class="fas fa-box-open" style="font-size: 4rem; color: #cbd5e1; opacity: 0.5;"></i>
@@ -1001,47 +1172,276 @@ include __DIR__ . '/inc/header-new.php';
                     <?php endif; ?>
                 </div>
 
-                <!-- Basic Product Info -->
+                <!-- Product Description and Specifications Tabs -->
                 <div class="product-specs">
-                    <div class="specs-title">
-                        <i class="fas fa-clipboard-list"></i> Thông tin cơ bản
+                    <div class="tab-nav">
+                        <button class="tab-button active" onclick="showTab('description')">
+                            <i class="fas fa-info-circle"></i> Mô tả sản phẩm
+                        </button>
+                        <button class="tab-button" onclick="showTab('specifications')">
+                            <i class="fas fa-list-ul"></i> Thông số kỹ thuật
+                        </button>
+                        <!-- Luôn hiển thị tab sản phẩm con để debug -->
+                        <button class="tab-button" onclick="showTab('items')">
+                            <i class="fas fa-th-large"></i> Sản phẩm con (<?php echo count($productItems); ?>)
+                        </button>
+                        <?php if (!empty($productFiles)): ?>
+                        <button class="tab-button" onclick="showTab('files')">
+                            <i class="fas fa-file-pdf"></i> Tài liệu (<?php echo count($productFiles); ?>)
+                        </button>
+                        <?php endif; ?>
                     </div>
-                    <ul class="specs-list">
-                        <li>
-                            <span class="spec-label">Mã sản phẩm</span>
-                            <span class="spec-value">#SP<?php echo str_pad($product['id'], 5, '0', STR_PAD_LEFT) ?></span>
-                        </li>
-                        <?php if ($product['material_type']): ?>
-                        <li>
-                            <span class="spec-label">Loại vật liệu</span>
-                            <span class="spec-value"><?php echo htmlspecialchars($product['material_type']) ?></span>
-                        </li>
+
+                    <div id="description" class="tab-content active" style="padding: 1.5rem 2rem;">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-info-circle"></i> Thông tin sản phẩm
+                        </h3>
+                        <p style="text-align: justify;"><?php echo nl2br(htmlspecialchars(getTranslatedDescription($product) ?: t('product_detail_description'))) ?></p>
+                        
+                        <?php if ($product['application']): ?>
+                        <h4 style="margin-top: 1.5rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-tools"></i> Ứng dụng
+                        </h4>
+                        <p style="text-align: justify;"><?php echo nl2br(htmlspecialchars($product['application'])) ?></p>
                         <?php endif; ?>
-                        <?php if ($product['thickness']): ?>
-                        <li>
-                            <span class="spec-label">Độ dày</span>
-                            <span class="spec-value"><?php echo htmlspecialchars($product['thickness']) ?></span>
-                        </li>
+                        
+                        <?php if ($product['product_function']): ?>
+                        <h4 style="margin-top: 1.5rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-cogs"></i> Chức năng
+                        </h4>
+                        <p style="text-align: justify;"><?php echo nl2br(htmlspecialchars($product['product_function'])) ?></p>
                         <?php endif; ?>
-                        <?php if ($product['color']): ?>
-                        <li>
-                            <span class="spec-label">Màu sắc</span>
-                            <span class="spec-value"><?php echo htmlspecialchars($product['color']) ?></span>
-                        </li>
-                        <?php endif; ?>
-                        <?php if ($product['warranty']): ?>
-                        <li>
-                            <span class="spec-label">Bảo hành</span>
-                            <span class="spec-value"><?php echo htmlspecialchars($product['warranty']) ?></span>
-                        </li>
-                        <?php endif; ?>
-                        <li>
-                            <span class="spec-label">Trạng thái</span>
-                            <span class="spec-value" style="color: <?php echo $product['status'] ? '#10b981' : '#ef4444' ?>;">
-                                <?php echo $product['status'] ? 'Có sẵn' : 'Hết hàng' ?>
-                            </span>
-                        </li>
-                    </ul>
+                    </div>
+
+                    <div id="specifications" class="tab-content" style="padding: 1.5rem 2rem;">
+                        <h3 style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-list-ul"></i> Thông số kỹ thuật
+                        </h3>
+                        <table class="specs-table" style="width: 100%;">
+                            <tbody>
+                                <?php if ($product['manufacturer']): ?>
+                                <tr>
+                                    <td><strong>Nhà sản xuất</strong></td>
+                                    <td><?php echo htmlspecialchars($product['manufacturer']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['origin'] || $product['manufacturer_origin']): ?>
+                                <tr>
+                                    <td><strong>Xuất xứ</strong></td>
+                                    <td><?php echo htmlspecialchars($product['origin'] ?? $product['manufacturer_origin'] ?? '') ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['material_type']): ?>
+                                <tr>
+                                    <td><strong>Loại vật liệu</strong></td>
+                                    <td><?php echo htmlspecialchars($product['material_type']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['brand']): ?>
+                                <tr>
+                                    <td><strong>Thương hiệu</strong></td>
+                                    <td><?php echo htmlspecialchars($product['brand']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['thickness']): ?>
+                                <tr>
+                                    <td><strong>Độ dày</strong></td>
+                                    <td><?php echo htmlspecialchars($product['thickness']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['color']): ?>
+                                <tr>
+                                    <td><strong>Màu sắc</strong></td>
+                                    <td><?php echo htmlspecialchars($product['color']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['warranty']): ?>
+                                <tr>
+                                    <td><strong>Bảo hành</strong></td>
+                                    <td><?php echo htmlspecialchars($product['warranty']) ?></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['website']): ?>
+                                <tr>
+                                    <td><strong>Website</strong></td>
+                                    <td><a href="<?php echo htmlspecialchars($product['website']); ?>" target="_blank" style="color: #0284c7;"><?php echo htmlspecialchars($product['website']); ?></a></td>
+                                </tr>
+                                <?php endif; ?>
+                                <?php if ($product['stock']): ?>
+                                <tr>
+                                    <td><strong>Số lượng tồn kho</strong></td>
+                                    <td><?php echo number_format($product['stock']) ?> sản phẩm</td>
+                                </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- HIỂN THỊ SẢN PHẨM CON (PRODUCT ITEMS) -->
+                    <?php 
+                    // DEBUG: Luôn hiển thị debug info để kiểm tra
+                    $itemsCount = count($productItems);
+                    ?>
+                    <?php if (!empty($productItems)): ?>
+                    <div id="items" class="tab-content" style="padding: 1.5rem 2rem;">
+                        <!-- DEBUG INFO (hiển thị cho mọi người để debug) -->
+                        <div style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; margin-bottom: 1rem; border-radius: 5px; font-size: 12px;">
+                            <strong>DEBUG INFO:</strong> 
+                            <br>- Found <?php echo $itemsCount; ?> items
+                            <br>- Collection ID: <?php echo htmlspecialchars($product['collection_id'] ?? 'NULL'); ?>
+                            <br>- Product ID: <?php echo $id; ?>
+                            <br>- Product Name: <?php echo htmlspecialchars($product['name'] ?? 'N/A'); ?>
+                </div>
+                        <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-th-large"></i> Danh sách sản phẩm (<?php echo count($productItems); ?>)
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+                            <?php foreach ($productItems as $item): ?>
+                            <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; transition: all 0.3s;" 
+                                 onmouseover="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 4px 12px rgba(56,189,248,0.2)'"
+                                 onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                                <?php 
+                                // Lấy ảnh từ field image (bảng mới) hoặc primary_image/thumbnail (bảng cũ)
+                                $itemImage = $item['image'] ?? $item['primary_image'] ?? $item['thumbnail'] ?? null;
+                                ?>
+                                <?php if (!empty($itemImage)): ?>
+                                <div style="margin-bottom: 1rem; text-align: center;">
+                                    <img src="<?php echo htmlspecialchars($itemImage); ?>" 
+                                         alt="<?php echo htmlspecialchars($item['name']); ?>"
+                                         style="max-width: 100%; max-height: 200px; border-radius: 8px; object-fit: contain; background: white; padding: 10px;"
+                                         onerror="this.onerror=null; this.src='assets/images/products/default.jpg';">
+                                </div>
+                                <?php endif; ?>
+                                
+                                <h4 style="font-size: 1.1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.75rem;">
+                                    <?php echo htmlspecialchars($item['name']); ?>
+                                </h4>
+                                
+                                <?php if (!empty($item['description'])): ?>
+                                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem; line-height: 1.5;">
+                                    <?php echo nl2br(htmlspecialchars($item['description'])); ?>
+                                </p>
+                                <?php endif; ?>
+                                
+                                <div style="font-size: 0.85rem; color: #64748b; line-height: 1.6;">
+                                    <?php if (!empty($item['collection'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Bộ sưu tập:</strong> <?php echo htmlspecialchars($item['collection']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['composition'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Thành phần:</strong> <?php echo htmlspecialchars($item['composition']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['width'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Kích thước:</strong> <?php echo htmlspecialchars($item['width']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['finishing'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Hoàn thiện:</strong> <?php echo htmlspecialchars($item['finishing']); ?></div>
+                                    <?php elseif (!empty($item['finish_type'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Hoàn thiện:</strong> <?php echo htmlspecialchars($item['finish_type']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['color'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Màu sắc:</strong> <?php echo htmlspecialchars($item['color']); ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($item['warranty'])): ?>
+                                        <div style="margin-bottom: 0.5rem;"><strong>Bảo hành:</strong> <?php echo htmlspecialchars($item['warranty']); ?></div>
+                                    <?php endif; ?>
+                                    
+                                    <!-- HIỂN THỊ FILES CỦA ITEM (2D, 3D, TDS) -->
+                                    <?php 
+                                    $itemFiles = $itemFilesMap[$item['id']] ?? [];
+                                    if (!empty($itemFiles)): 
+                                    ?>
+                                    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e2e8f0;">
+                                        <strong style="color: #1e293b; font-size: 0.9rem; display: block; margin-bottom: 0.5rem;">
+                                            <i class="fas fa-file-alt"></i> Tài liệu:
+                                        </strong>
+                                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                            <?php foreach ($itemFiles as $file): ?>
+                                            <a href="<?php echo htmlspecialchars($file['file_url']); ?>" 
+                                               target="_blank" 
+                                               rel="noopener noreferrer"
+                                               style="display: inline-block; padding: 0.4rem 0.8rem; background: #3b82f6; color: white; border-radius: 6px; text-decoration: none; font-size: 0.8rem; transition: background 0.2s;"
+                                               onmouseover="this.style.background='#2563eb'"
+                                               onmouseout="this.style.background='#3b82f6'">
+                                                <i class="fas fa-download"></i> <?php echo htmlspecialchars($file['title'] ?? $file['file_name']); ?>
+                                            </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($item['price'])): ?>
+                                        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+                                            <strong style="color: #059669; font-size: 1.1rem;">
+                                                <?php echo number_format($item['price'], 0, ',', '.') ?>đ
+                                            </strong>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        
+                    </div>
+                    
+                    <!-- Tab Files/Catalogue -->
+                    <?php if (!empty($productFiles)): ?>
+                    <div id="files" class="tab-content" style="padding: 1.5rem 2rem;">
+                        <h3 style="margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                            <i class="fas fa-file-pdf"></i> Tài liệu & Catalogue (<?php echo count($productFiles); ?>)
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+                            <?php foreach ($productFiles as $file): ?>
+                            <div style="background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; text-align: center; transition: all 0.3s;"
+                                 onmouseover="this.style.borderColor='#3b82f6'; this.style.boxShadow='0 4px 12px rgba(59,130,246,0.2)'"
+                                 onmouseout="this.style.borderColor='#e2e8f0'; this.style.boxShadow='none'">
+                                <div style="font-size: 3rem; color: #dc2626; margin-bottom: 1rem;">
+                                    <i class="fas fa-file-pdf"></i>
+                                </div>
+                                <h4 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.5rem;">
+                                    <?php echo htmlspecialchars($file['title'] ?? $file['file_name']); ?>
+                                </h4>
+                                <?php if (!empty($file['description'])): ?>
+                                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+                                    <?php echo htmlspecialchars($file['description']); ?>
+                                </p>
+                                <?php endif; ?>
+                                <a href="<?php echo htmlspecialchars($file['file_url']); ?>" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   style="display: inline-block; padding: 0.6rem 1.2rem; background: #dc2626; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; transition: background 0.2s;"
+                                   onmouseover="this.style.background='#b91c1c'"
+                                   onmouseout="this.style.background='#dc2626'">
+                                    <i class="fas fa-download"></i> Tải về
+                                </a>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <?php else: ?>
+                    <!-- Hiển thị thông báo nếu không có items -->
+                    <div id="items" class="tab-content" style="padding: 1.5rem 2rem;">
+                        <div style="background: #f8d7da; border: 1px solid #dc3545; padding: 15px; border-radius: 8px; color: #721c24;">
+                            <strong>⚠️ DEBUG:</strong> Không tìm thấy sản phẩm con
+                            <br>- Collection ID: <?php echo htmlspecialchars($product['collection_id'] ?? 'NULL'); ?>
+                            <br>- Product ID: <?php echo $id; ?>
+                            <br>- Product Name: <?php echo htmlspecialchars($product['name'] ?? 'N/A'); ?>
+                            <br><br>
+                            <small>Vui lòng kiểm tra:</small>
+                            <ul style="margin: 10px 0; padding-left: 20px;">
+                                <li>Sản phẩm có collection_id trong database?</li>
+                                <li>Có items trong product_collection_items table?</li>
+                                <li>Khi scrape có lấy được items không?</li>
+                                <li>Khi import có tạo collection và items không?</li>
+                            </ul>
+                            <br>
+                            <a href="backend/debug_product_items.php?id=<?php echo $id; ?>" target="_blank" style="color: #dc3545; text-decoration: underline;">
+                                🔍 Xem chi tiết debug →
+                            </a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -1087,25 +1487,30 @@ include __DIR__ . '/inc/header-new.php';
                     <h4><i class="fas fa-handshake"></i> Nhà cung cấp</h4>
                     <div class="supplier-contact">
                         <!-- Supplier Logo -->
-                        <?php if ($product['supplier_logo']): ?>
+                        <?php 
+                        $supplierLogoPath = getSupplierLogoPath($product['supplier_logo'] ?? null);
+                        if ($supplierLogoPath): 
+                        ?>
                             <div class="supplier-logo-container">
                                 <?php if ($product['supplier_id']): ?>
-                                    <a href="supplier-detail.php?id=<?php echo $product['supplier_id'] ?>" class="supplier-logo-link">
-                                        <img src="<?php echo htmlspecialchars($product['supplier_logo']) ?>" 
+                                    <a href="<?php echo buildSupplierUrl(['id' => $product['supplier_id'], 'name' => $product['supplier_name'], 'name_en' => $product['supplier_name_en'] ?? '']); ?>" class="supplier-logo-link">
+                                        <img src="<?php echo htmlspecialchars($supplierLogoPath) ?>" 
                                              alt="<?php echo htmlspecialchars($product['supplier_name']) ?>" 
-                                             class="supplier-logo-img">
+                                             class="supplier-logo-img"
+                                             onerror="this.onerror=null; this.style.display='none';">
                                     </a>
                                 <?php else: ?>
-                                    <img src="<?php echo htmlspecialchars($product['supplier_logo']) ?>" 
+                                    <img src="<?php echo htmlspecialchars($supplierLogoPath) ?>" 
                                          alt="<?php echo htmlspecialchars($product['supplier_name']) ?>" 
-                                         class="supplier-logo-img">
+                                         class="supplier-logo-img"
+                                         onerror="this.onerror=null; this.style.display='none';">
                                 <?php endif; ?>
                             </div>
                         <?php endif; ?>
                         
                         <div class="supplier-name-link">
                             <?php if ($product['supplier_id']): ?>
-                                <a href="supplier-detail.php?id=<?php echo $product['supplier_id'] ?>">
+                                <a href="<?php echo buildSupplierUrl(['id' => $product['supplier_id'], 'name' => $product['supplier_name'], 'name_en' => $product['supplier_name_en'] ?? '']); ?>">
                                     <?php echo htmlspecialchars($product['supplier_name']) ?>
                                     <i class="fas fa-external-link-alt" style="font-size: 0.75rem; margin-left: 0.3rem; opacity: 0.7;"></i>
                                 </a>
@@ -1147,115 +1552,29 @@ include __DIR__ . '/inc/header-new.php';
             </div>
         </div>
 
-        <!-- Product Tabs -->
-                <div class="product-tabs">
-                    <div class="tab-nav">
-                        <button class="tab-button active" onclick="showTab('description')">
-                            <i class="fas fa-info-circle"></i> Mô tả sản phẩm
-                        </button>
-                        <button class="tab-button" onclick="showTab('specifications')">
-                            <i class="fas fa-list-ul"></i> Thông số kỹ thuật
-                        </button>
-                    </div>
-
-                    <div id="description" class="tab-content active">
-                        <h3><i class="fas fa-info-circle"></i> Thông tin sản phẩm</h3>
-                        <p><?php echo nl2br(htmlspecialchars(getTranslatedDescription($product) ?: t('product_detail_description'))) ?></p>
-                        
-                        <?php if ($product['application']): ?>
-                    <h4 style="margin-top: 1.5rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-tools"></i> Ứng dụng
-                    </h4>
-                            <p><?php echo nl2br(htmlspecialchars($product['application'])) ?></p>
-                        <?php endif; ?>
-                        
-                        <?php if ($product['product_function']): ?>
-                    <h4 style="margin-top: 1.5rem; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
-                        <i class="fas fa-cogs"></i> Chức năng
-                    </h4>
-                            <p><?php echo nl2br(htmlspecialchars($product['product_function'])) ?></p>
-                        <?php endif; ?>
-                    </div>
-
-                    <div id="specifications" class="tab-content">
-                        <h3><i class="fas fa-list-ul"></i> Thông số kỹ thuật</h3>
-                <table class="specs-table">
-                            <tbody>
-                                <?php if ($product['manufacturer']): ?>
-                                <tr>
-                                    <td><strong>Nhà sản xuất</strong></td>
-                                    <td><?php echo htmlspecialchars($product['manufacturer']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['origin']): ?>
-                                <tr>
-                                    <td><strong>Xuất xứ</strong></td>
-                                    <td><?php echo htmlspecialchars($product['origin']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['material_type']): ?>
-                                <tr>
-                                    <td><strong>Loại vật liệu</strong></td>
-                                    <td><?php echo htmlspecialchars($product['material_type']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['thickness']): ?>
-                                <tr>
-                                    <td><strong>Độ dày</strong></td>
-                                    <td><?php echo htmlspecialchars($product['thickness']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['color']): ?>
-                                <tr>
-                                    <td><strong>Màu sắc</strong></td>
-                                    <td><?php echo htmlspecialchars($product['color']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['warranty']): ?>
-                                <tr>
-                                    <td><strong>Bảo hành</strong></td>
-                                    <td><?php echo htmlspecialchars($product['warranty']) ?></td>
-                                </tr>
-                                <?php endif; ?>
-                                <?php if ($product['stock']): ?>
-                                <tr>
-                                    <td><strong>Số lượng tồn kho</strong></td>
-                                    <td><?php echo number_format($product['stock']) ?> sản phẩm</td>
-                                </tr>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-            </div>
-                    </div>
-
         <!-- Supplier Products Section -->
         <?php if (!empty($supplierProducts)): ?>
-        <section class="product-list-section">
+        <section class="product-list-section" style="margin-top: 60px;">
             <div class="section-header">
                 <h2 class="section-title">
                     <i class="fas fa-store"></i>
                     Sản phẩm khác từ 
                     <?php if ($product['supplier_id']): ?>
-                        <a href="supplier-detail.php?id=<?php echo $product['supplier_id'] ?>">
+                        <a href="<?php echo buildSupplierUrl(['id' => $product['supplier_id'], 'name' => $product['supplier_name'], 'name_en' => $product['supplier_name_en'] ?? '']); ?>">
                             <?php echo htmlspecialchars($product['supplier_name'] ?: 'nhà cung cấp này') ?>
                         </a>
                     <?php else: ?>
                         <?php echo htmlspecialchars($product['supplier_name'] ?: 'nhà cung cấp này') ?>
                             <?php endif; ?>
                 </h2>
-                <?php if ($product['supplier_id']): ?>
-                <a href="supplier-detail.php?id=<?php echo $product['supplier_id'] ?>" class="view-all">
-                    Xem tất cả <i class="fas fa-arrow-right"></i>
-                </a>
-                                    <?php endif; ?>
-                                </div>
+            </div>
             <div class="products-scroll-wrapper">
                 <button class="scroll-nav-btn prev" data-scroll="supplier-products">
                     <i class="fas fa-chevron-left"></i>
                 </button>
                 <div class="products-grid" id="supplier-products">
                 <?php foreach ($supplierProducts as $sp): ?>
-                <a href="product-detail.php?id=<?php echo $sp['id'] ?>" class="product-card">
+                <a href="<?php echo buildProductUrl($sp); ?>" class="product-card">
                     <?php if ($sp['featured_image']): ?>
                         <img src="<?php echo htmlspecialchars($sp['featured_image']) ?>" 
                              alt="<?php echo htmlspecialchars($sp['name']) ?>" 
@@ -1283,25 +1602,20 @@ include __DIR__ . '/inc/header-new.php';
 
         <!-- Related Products Section -->
         <?php if (!empty($relatedProducts)): ?>
-        <section class="product-list-section">
+        <section class="product-list-section" style="margin-top: 60px;">
             <div class="section-header">
                 <h2 class="section-title">
                     <i class="fas fa-th-large"></i>
                     Sản phẩm cùng danh mục
                 </h2>
-                <?php if ($product['category']): ?>
-                <a href="products.php?category=<?php echo urlencode($product['category']) ?>" class="view-all">
-                    Xem tất cả <i class="fas fa-arrow-right"></i>
-                        </a>
-                        <?php endif; ?>
-                    </div>
+            </div>
             <div class="products-scroll-wrapper">
                 <button class="scroll-nav-btn prev" data-scroll="related-products">
                     <i class="fas fa-chevron-left"></i>
                 </button>
                 <div class="products-grid" id="related-products">
                 <?php foreach ($relatedProducts as $rp): ?>
-                <a href="product-detail.php?id=<?php echo $rp['id'] ?>" class="product-card">
+                <a href="<?php echo buildProductUrl($rp); ?>" class="product-card">
                     <?php if ($rp['featured_image']): ?>
                         <img src="<?php echo htmlspecialchars($rp['featured_image']) ?>" 
                              alt="<?php echo htmlspecialchars($rp['name']) ?>" 

@@ -28,7 +28,7 @@ $sliders = getActiveSliders();
 
 <?php if (!empty($sliders)): ?>
 <!-- Slider Section -->
-<section class="main-slider" id="main-slider">
+<section class="main-slider fullpage-section" id="main-slider" data-section-label="Trang chủ">
     <div class="slider-container">
         <div class="slider-wrapper">
             <?php foreach ($sliders as $index => $slider): ?>
@@ -102,7 +102,7 @@ $sliders = getActiveSliders();
     overflow: hidden;
     margin: 0 !important;
     padding: 0 !important;
-    background: transparent; /* Loại bỏ background tối */
+    background: #1e293b; /* Background tối để tránh flash trắng/xám */
     left: 0;
     right: 0;
     border: none !important;
@@ -136,8 +136,9 @@ $sliders = getActiveSliders();
     height: 100%;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1), visibility 1s;
+    transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
     z-index: 1;
+    background: #1e293b; /* Background tối để tránh flash */
 }
 
 .slide.active {
@@ -152,17 +153,26 @@ $sliders = getActiveSliders();
     left: 0;
     width: 100%;
     height: 100%;
-    background-size: cover; /* Lấp đầy khung, ít crop nhất */
-    background-position: center top; /* Ưu tiên hiển thị phần trên, crop phần dưới */
+    background-size: cover;
+    background-position: center center;
     background-repeat: no-repeat;
-    background-color: transparent; /* Loại bỏ background tối */
-    transform: scale(1);
-    transition: transform 10s ease-out;
+    background-color: #1e293b; /* Background tối để tránh flash khi load ảnh */
+    transform: scale(1.05);
+    transition: transform 12s ease-out, opacity 0.8s ease-in-out;
+    opacity: 0;
+    will-change: opacity, transform; /* Tối ưu performance */
     border: none !important;
 }
 
 .slide.active .slide-background {
-    transform: scale(1); /* Không phóng to */
+    transform: scale(1);
+    opacity: 1;
+}
+
+/* Slide đầu tiên hiển thị ngay không cần transition */
+.slide:first-child.active .slide-background {
+    opacity: 1;
+    transform: scale(1);
 }
 
 .slide-overlay {
@@ -171,7 +181,19 @@ $sliders = getActiveSliders();
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.1); /* Giảm overlay từ 0.3 xuống 0.1 - sáng hơn */
+    background: linear-gradient(135deg, rgba(0, 0, 0, 0.2) 0%, rgba(0, 0, 0, 0.4) 100%);
+    opacity: 0;
+    transition: opacity 0.8s ease-in-out;
+    will-change: opacity; /* Tối ưu performance */
+}
+
+.slide.active .slide-overlay {
+    opacity: 1;
+}
+
+/* Slide đầu tiên overlay hiển thị ngay */
+.slide:first-child.active .slide-overlay {
+    opacity: 1;
 }
 
 .slide-content {
@@ -187,6 +209,7 @@ $sliders = getActiveSliders();
     padding: 40px 20px;
     opacity: 0;
     transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none; /* Không block clicks đến navigation buttons */
 }
 
 .slide-content .container {
@@ -290,21 +313,23 @@ section.main-slider {
     display: inline-flex;
     align-items: center;
     gap: 12px;
-    padding: 18px 45px;
+    padding: 16px 40px;
     margin-top: 20px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(135deg, #C8102E 0%, #A00D26 100%);
+    color: #ffffff;
     text-decoration: none;
     border-radius: 50px;
     font-weight: 700;
-    font-size: 1.15rem;
+    font-size: 1.05rem;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
-    border: 2px solid rgba(255, 255, 255, 0.2);
+    letter-spacing: 0.04em;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 8px 28px rgba(200, 16, 46, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     position: relative;
     overflow: hidden;
+    pointer-events: auto; /* Cho phép click nút kể cả khi parent tắt pointer-events */
+    z-index: 1002;
 }
 
 .slide-btn::before {
@@ -323,11 +348,11 @@ section.main-slider {
 }
 
 .slide-btn:hover {
-    transform: translateY(-4px) scale(1.05);
-    box-shadow: 0 20px 60px rgba(102, 126, 234, 0.6);
-    color: white;
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 16px 44px rgba(200, 16, 46, 0.5);
+    color: #ffffff;
     text-decoration: none;
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: rgba(255, 255, 255, 0.45);
 }
 
 .slide-btn::after {
@@ -347,49 +372,82 @@ section.main-slider {
     left: 0;
     right: 0;
     transform: translateY(-50%);
-    z-index: 4;
+    z-index: 1000; /* Tăng z-index cao để đảm bảo không bị che */
     pointer-events: none;
 }
 
 .slider-prev,
 .slider-next {
     position: absolute;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(20px);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    width: 65px;
-    height: 65px;
-    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
     cursor: pointer;
-    font-size: 22px;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: auto;
+    font-size: 16px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: auto !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+    z-index: 1001;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    opacity: 0.7;
+}
+
+/* Re-enable interactions for links inside slide content */
+.slide-content a { pointer-events: auto; }
+
+/* Trên thiết bị cảm ứng, luôn hiển thị nội dung để có thể bấm nút */
+@media (hover: none) {
+    .slide.active .slide-content { opacity: 1; }
 }
 
 .slider-prev {
-    left: 40px;
+    left: 20px;
 }
 
 .slider-next {
-    right: 40px;
+    right: 20px;
 }
 
 .slider-prev:hover,
 .slider-next:hover {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: scale(1.15);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: white;
+    transform: scale(1.08) translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15), 0 2px 6px rgba(0, 0, 0, 0.1);
+    opacity: 1;
 }
 
 .slider-prev:active,
 .slider-next:active {
-    transform: scale(1.05);
+    transform: scale(1.02) translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Icon inside button - smoother */
+.slider-prev i,
+.slider-next i {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
+}
+
+.slider-prev:hover i {
+    transform: translateX(-2px);
+}
+
+.slider-next:hover i {
+    transform: translateX(2px);
 }
 
 /* Dot Navigation - REMOVED */
@@ -456,9 +514,10 @@ section.main-slider {
     
     .slider-prev,
     .slider-next {
-        width: 50px;
-        height: 50px;
-        font-size: 16px;
+        width: 40px;
+        height: 40px;
+        font-size: 13px;
+        border-radius: 10px;
     }
     
     .slider-prev {
@@ -467,6 +526,11 @@ section.main-slider {
     
     .slider-next {
         right: 15px;
+    }
+    
+    .slider-prev i,
+    .slider-next i {
+        font-size: 12px;
     }
     
 }
@@ -508,9 +572,10 @@ section.main-slider {
     
     .slider-prev,
     .slider-next {
-        width: 46px;
-        height: 46px;
-        font-size: 15px;
+        width: 36px;
+        height: 36px;
+        font-size: 12px;
+        border-radius: 9px;
     }
     
     .slider-prev {
@@ -519,6 +584,11 @@ section.main-slider {
     
     .slider-next {
         right: 12px;
+    }
+    
+    .slider-prev i,
+    .slider-next i {
+        font-size: 11px;
     }
 }
 
@@ -572,9 +642,10 @@ section.main-slider {
     
     .slider-prev,
     .slider-next {
-        width: 42px;
-        height: 42px;
-        font-size: 14px;
+        width: 34px;
+        height: 34px;
+        font-size: 11px;
+        border-radius: 8px;
     }
     
     .slider-prev {
@@ -583,6 +654,11 @@ section.main-slider {
     
     .slider-next {
         right: 10px;
+    }
+    
+    .slider-prev i,
+    .slider-next i {
+        font-size: 10px;
     }
 }
 
@@ -622,9 +698,15 @@ section.main-slider {
     
     .slider-prev,
     .slider-next {
-        width: 38px;
-        height: 38px;
-        font-size: 13px;
+        width: 32px;
+        height: 32px;
+        font-size: 10px;
+        border-radius: 7px;
+    }
+    
+    .slider-prev i,
+    .slider-next i {
+        font-size: 9px;
     }
 }
 
@@ -666,9 +748,10 @@ section.main-slider {
     
     .slider-prev,
     .slider-next {
-        width: 36px;
-        height: 36px;
-        font-size: 12px;
+        width: 30px;
+        height: 30px;
+        font-size: 9px;
+        border-radius: 6px;
     }
     
     .slider-prev {
@@ -677,6 +760,11 @@ section.main-slider {
     
     .slider-next {
         right: 8px;
+    }
+    
+    .slider-prev i,
+    .slider-next i {
+        font-size: 8px;
     }
 }
 </style>
@@ -692,22 +780,48 @@ function showSlide(n) {
     if (n >= slides.length) currentSlideIndex = 0;
     if (n < 0) currentSlideIndex = slides.length - 1;
     
+    // Preload next slide image để tránh flash
+    const nextIndex = currentSlideIndex;
+    if (slides[nextIndex]) {
+        const nextSlide = slides[nextIndex];
+        const bgImg = nextSlide.querySelector('.slide-background');
+        if (bgImg) {
+            const imgUrl = bgImg.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+            if (imgUrl && imgUrl[1]) {
+                const img = new Image();
+                img.src = imgUrl[1];
+            }
+        }
+    }
+    
+    // Remove active class từ tất cả slides
     slides.forEach(slide => slide.classList.remove('active'));
     
+    // Add active class cho slide hiện tại với delay nhỏ để transition mượt
     if (slides[currentSlideIndex]) {
-        slides[currentSlideIndex].classList.add('active');
+        setTimeout(() => {
+            slides[currentSlideIndex].classList.add('active');
+        }, 50);
     }
 }
 
 function nextSlide() {
     currentSlideIndex++;
     showSlide(currentSlideIndex);
+    stopAutoSlide(); // Dừng auto slide khi user click
+    setTimeout(() => startAutoSlide(), 5000); // Resume sau 5 giây
 }
 
 function prevSlide() {
     currentSlideIndex--;
     showSlide(currentSlideIndex);
+    stopAutoSlide(); // Dừng auto slide khi user click
+    setTimeout(() => startAutoSlide(), 5000); // Resume sau 5 giây
 }
+
+// Đảm bảo functions được định nghĩa trong global scope
+window.nextSlide = nextSlide;
+window.prevSlide = prevSlide;
 
 function currentSlide(n) {
     currentSlideIndex = n;
@@ -728,10 +842,71 @@ function stopAutoSlide() {
     }
 }
 
+// Preload all slide images
+function preloadSlideImages() {
+    const slides = document.querySelectorAll('.slide');
+    slides.forEach(slide => {
+        const bgImg = slide.querySelector('.slide-background');
+        if (bgImg) {
+            const imgUrl = bgImg.style.backgroundImage.match(/url\(['"]?([^'"]+)['"]?\)/);
+            if (imgUrl && imgUrl[1]) {
+                const img = new Image();
+                img.src = imgUrl[1];
+                img.onload = function() {
+                    // Image loaded successfully
+                    bgImg.style.opacity = slide.classList.contains('active') ? '1' : '0';
+                };
+            }
+        }
+    });
+}
+
 // Initialize slider
 document.addEventListener('DOMContentLoaded', function() {
     const slider = document.getElementById('main-slider');
     if (slider) {
+        // Preload images first
+        preloadSlideImages();
+        
+        // Ensure first slide is visible immediately
+        const firstSlide = slider.querySelector('.slide.active');
+        if (firstSlide) {
+            const firstBg = firstSlide.querySelector('.slide-background');
+            if (firstBg) {
+                firstBg.style.opacity = '1';
+            }
+            const firstOverlay = firstSlide.querySelector('.slide-overlay');
+            if (firstOverlay) {
+                firstOverlay.style.opacity = '1';
+            }
+        }
+        
+        // Add event listeners cho navigation buttons
+        const prevBtn = slider.querySelector('.slider-prev');
+        const nextBtn = slider.querySelector('.slider-next');
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                prevSlide();
+            });
+            // Đảm bảo button có thể click
+            prevBtn.style.pointerEvents = 'auto';
+            prevBtn.style.cursor = 'pointer';
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                nextSlide();
+            });
+            // Đảm bảo button có thể click
+            nextBtn.style.pointerEvents = 'auto';
+            nextBtn.style.cursor = 'pointer';
+        }
+        
         startAutoSlide();
         
         // Pause auto slide on hover vào toàn bộ slider

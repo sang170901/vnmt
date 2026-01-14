@@ -39,8 +39,12 @@ $userData = $isLoggedIn ? [
     <meta name="description" content="VNMaterial - Vật liệu xây dựng Việt Nam">
     
     <!-- Favicon (using logo.png temporarily until proper favicon is created) -->
-    <link rel="icon" type="image/png" href="<?php echo defined('IMAGES_PATH') ? IMAGES_PATH : '/assets/images/'; ?>logo.png">
-    <link rel="apple-touch-icon" href="<?php echo defined('IMAGES_PATH') ? IMAGES_PATH : '/assets/images/'; ?>logo.png">
+    <?php 
+    $logoPath = (defined('IMAGES_PATH') ? IMAGES_PATH : '/assets/images/') . 'logo.png';
+    $logoVersion = file_exists(__DIR__ . '/../assets/images/logo.png') ? filemtime(__DIR__ . '/../assets/images/logo.png') : time();
+    ?>
+    <link rel="icon" type="image/png" href="<?php echo $logoPath; ?>?v=<?php echo $logoVersion; ?>">
+    <link rel="apple-touch-icon" href="<?php echo $logoPath; ?>?v=<?php echo $logoVersion; ?>">
     
     <!-- NEW CSS ONLY -->
     <link rel="stylesheet" href="assets/css/styles-new.css?v=<?php echo time(); ?>">
@@ -59,26 +63,34 @@ $userData = $isLoggedIn ? [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        /* Modern Header CSS - Embedded */
+        /* Modern Header CSS - Embedded - Kết hợp Đỏ Pantone & Xanh Dương */
         :root {
             --header-height: 80px;
-            --primary-color: #3b82f6;
-            --primary-dark: #2563eb;
-            --primary-light: #60a5fa;
-            --accent-color: #38bdf8;
-            --accent-dark: #22d3ee;
+            /* Xanh dương làm màu chính */
+            --primary-color: #2563eb;         /* Blue 600 */
+            --primary-dark: #1d4ed8;         /* Blue 700 */
+            --primary-light: #3b82f6;       /* Blue 500 */
+            --primary-lighter: #60a5fa;      /* Blue 400 */
+            /* Đỏ Pantone làm accent */
+            --accent-color: #C8102E;         /* Pantone 186 C */
+            --accent-dark: #A00D26;         /* Đỏ đậm */
+            --accent-light: #DA1A32;        /* Pantone 485 C */
             --text-primary: #1e293b;
             --text-secondary: #64748b;
             --text-hover: #0f172a;
             --bg-white: #ffffff;
-            --bg-header: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 30%, #bae6fd 70%, #7dd3fc 100%);
-            --bg-glass: rgba(240, 249, 255, 0.95);
+            /* Background kết hợp đỏ nhạt và xanh nhạt */
+            --bg-header: linear-gradient(135deg, #fef2f2 0%, #fee2e2 20%, #eff6ff 50%, #dbeafe 80%, #bfdbfe 100%);
+            --bg-glass: rgba(254, 242, 242, 0.95);
             --shadow-light: 0 1px 3px rgba(0, 0, 0, 0.1);
             --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.1);
             --shadow-strong: 0 10px 25px rgba(0, 0, 0, 0.15);
             --border-light: rgba(0, 0, 0, 0.08);
-            --gradient-primary: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
-            --gradient-hover: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            /* Gradients kết hợp đỏ và xanh */
+            --gradient-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 50%, #C8102E 100%);
+            --gradient-hover: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #A00D26 100%);
+            --gradient-blue: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            --gradient-red: linear-gradient(135deg, #C8102E 0%, #DA1A32 100%);
             --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
@@ -101,20 +113,22 @@ $userData = $isLoggedIn ? [
             left: 0;
             right: 0;
             height: var(--header-height);
-            background: #e0f2fe; /* Fallback color */
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 20%, #dbeafe 50%, #bfdbfe 80%, #93c5fd 100%);
+            background: #fef2f2; /* Fallback color - đỏ nhạt */
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 15%, #eff6ff 35%, #dbeafe 65%, #bfdbfe 85%, #fef2f2 100%);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-bottom: 2px solid rgba(59, 130, 246, 0.2);
+            border-bottom: 2px solid rgba(200, 16, 46, 0.15);
+            border-bottom: 2px solid rgba(37, 99, 235, 0.2);
+            border-image: linear-gradient(90deg, rgba(200, 16, 46, 0.3) 0%, rgba(37, 99, 235, 0.3) 100%) 1;
             z-index: 1000;
             transition: var(--transition);
-            box-shadow: 0 4px 20px rgba(14, 165, 233, 0.15);
+            box-shadow: 0 4px 20px rgba(200, 16, 46, 0.1), 0 4px 20px rgba(37, 99, 235, 0.1);
         }
 
         /* Header animations when scrolling */
         .new-header.scrolled {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
-            box-shadow: var(--shadow-strong);
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 30%, #eff6ff 50%, #dbeafe 70%, #fef2f2 100%);
+            box-shadow: 0 10px 25px rgba(200, 16, 46, 0.15), 0 10px 25px rgba(37, 99, 235, 0.15);
             transform: translateY(-2px);
         }
 
@@ -165,7 +179,7 @@ $userData = $isLoggedIn ? [
             top: 0;
             left: 0;
             height: 3px;
-            background: var(--gradient-primary);
+            background: linear-gradient(90deg, #C8102E 0%, #2563eb 50%, #C8102E 100%);
             width: 0%;
             transition: width 0.3s ease;
             z-index: 1001;
@@ -195,11 +209,12 @@ $userData = $isLoggedIn ? [
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.2rem;
+            justify-content: center;
+            gap: 0;
             text-decoration: none;
             color: inherit;
             padding: 0.65rem 0.95rem;
-            border-radius: 12px;
+            border-radius: 0; /* Bỏ viền bo tròn */
             transition: var(--transition);
             position: relative;
             overflow: hidden;
@@ -213,23 +228,23 @@ $userData = $isLoggedIn ? [
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(6, 182, 212, 0.15) 100%);
+            background: rgba(200, 16, 46, 0.15); /* Đỏ nhạt khi hover */
             opacity: 0;
             transition: var(--transition);
             z-index: -1;
-            border-radius: 12px;
+            border-radius: 0; /* Bỏ viền bo tròn */
             border: 2px solid transparent;
         }
 
         .nav-link:hover::before {
             opacity: 1;
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(34, 211, 238, 0.2) 100%);
-            border-color: rgba(56, 189, 248, 0.3);
+            background: rgba(200, 16, 46, 0.25); /* Đỏ đậm hơn khi hover */
+            border-color: rgba(200, 16, 46, 0.4);
         }
 
         .nav-link:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
+            box-shadow: 0 8px 20px rgba(200, 16, 46, 0.3);
         }
 
         /* Top bar indicator */
@@ -241,10 +256,10 @@ $userData = $isLoggedIn ? [
             transform: translateX(-50%);
             width: 0;
             height: 4px;
-            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            background: #C8102E; /* Đỏ cho indicator khi hover */
             transition: var(--transition);
             border-radius: 0 0 4px 4px;
-            box-shadow: 0 2px 10px rgba(14, 165, 233, 0.5);
+            box-shadow: 0 2px 10px rgba(200, 16, 46, 0.5);
         }
 
         .nav-link:hover::after,
@@ -255,10 +270,7 @@ $userData = $isLoggedIn ? [
         .nav-number {
             font-size: 0.85rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #2563eb; /* Xanh mặc định */
             letter-spacing: 2px;
             transition: var(--transition);
         }
@@ -266,10 +278,7 @@ $userData = $isLoggedIn ? [
         .nav-text {
             font-size: 0.9rem;
             font-weight: 700;
-            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #2563eb; /* Xanh mặc định */
             letter-spacing: 1.8px;
             white-space: nowrap;
             transition: var(--transition);
@@ -277,22 +286,16 @@ $userData = $isLoggedIn ? [
 
         .nav-link:hover .nav-number,
         .nav-link.active .nav-number {
-            background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #C8102E; /* Đỏ khi hover - màu ngược lại */
             transform: translateY(-2px) scale(1.15);
-            filter: drop-shadow(0 2px 8px rgba(14, 165, 233, 0.5));
+            filter: drop-shadow(0 2px 8px rgba(200, 16, 46, 0.6));
         }
 
         .nav-link:hover .nav-text,
         .nav-link.active .nav-text {
-            background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: #C8102E; /* Đỏ khi hover - màu ngược lại */
             transform: translateY(-2px);
-            filter: drop-shadow(0 3px 10px rgba(2, 132, 199, 0.6));
+            filter: drop-shadow(0 3px 10px rgba(200, 16, 46, 0.7));
         }
 
         /* Action Buttons */
@@ -315,8 +318,8 @@ $userData = $isLoggedIn ? [
             justify-content: center;
             background: transparent;
             border: none;
-            border-radius: 50%;
-            color: var(--text-secondary);
+            border-radius: 8px; /* Bỏ bo tròn, dùng góc vuông */
+            color: #2563eb; /* Xanh mặc định */
             text-decoration: none;
             font-size: 1.1rem;
             font-weight: 600;
@@ -334,10 +337,10 @@ $userData = $isLoggedIn ? [
             left: 0;
             right: 0;
             bottom: 0;
-            background: var(--gradient-hover);
+            background: rgba(200, 16, 46, 0.1); /* Đỏ nhạt khi hover */
             opacity: 0;
             transition: var(--transition);
-            border-radius: 50%; /* Changed to circular */
+            border-radius: 8px; /* Bỏ bo tròn */
         }
 
         .action-btn:hover::before {
@@ -345,10 +348,10 @@ $userData = $isLoggedIn ? [
         }
 
         .action-btn:hover {
-            border-color: var(--primary-light);
-            color: white;
+            border-color: #C8102E;
+            color: #C8102E; /* Đỏ khi hover */
             transform: translateY(-3px) scale(1.08);
-            box-shadow: var(--shadow-medium);
+            box-shadow: 0 4px 12px rgba(200, 16, 46, 0.4);
         }
 
         .action-btn i,
@@ -371,7 +374,7 @@ $userData = $isLoggedIn ? [
             min-width: 104px;
             min-height: 104px;
             border-radius: 50%;
-            border: 3px solid rgba(56, 189, 248, 0.3);
+            border: 3px solid rgba(37, 99, 235, 0.4); /* Xanh mặc định */
             cursor: pointer;
             transition: var(--transition);
             display: block;
@@ -381,8 +384,8 @@ $userData = $isLoggedIn ? [
         
         .user-avatar-btn:hover {
             transform: scale(1.1);
-            border-color: #38bdf8;
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+            border-color: #C8102E; /* Đỏ khi hover */
+            box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.3);
         }
         
         .user-dropdown {
@@ -464,8 +467,8 @@ $userData = $isLoggedIn ? [
             justify-content: center;
             background: transparent;
             border: none;
-            border-radius: 50%; /* Changed to circular */
-            color: var(--text-secondary);
+            border-radius: 8px; /* Bỏ bo tròn, dùng góc vuông */
+            color: #2563eb; /* Xanh mặc định */
             text-decoration: none;
             font-size: 1.1rem;
             cursor: pointer;
@@ -482,10 +485,10 @@ $userData = $isLoggedIn ? [
             left: 0;
             right: 0;
             bottom: 0;
-            background: var(--gradient-hover);
+            background: rgba(200, 16, 46, 0.1); /* Đỏ nhạt khi hover */
             opacity: 0;
             transition: var(--transition);
-            border-radius: 50%; /* Changed to circular */
+            border-radius: 8px; /* Bỏ bo tròn */
         }
         
         .btn-login:hover::before {
@@ -493,9 +496,9 @@ $userData = $isLoggedIn ? [
         }
         
         .btn-login:hover {
-            color: white;
+            color: #C8102E; /* Đỏ khi hover */
             transform: translateY(-3px) scale(1.08);
-            box-shadow: var(--shadow-medium);
+            box-shadow: 0 4px 12px rgba(200, 16, 46, 0.4);
         }
         
         .btn-login i {
@@ -523,9 +526,13 @@ $userData = $isLoggedIn ? [
         .hamburger-line {
             width: 32px;
             height: 4px;
-            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            background: #2563eb; /* Xanh mặc định */
             border-radius: 4px;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .mobile-menu-toggle:hover .hamburger-line {
+            background: #C8102E; /* Đỏ khi hover */
         }
 
         .mobile-menu-toggle.active .hamburger-line:nth-child(1) {
@@ -618,7 +625,7 @@ $userData = $isLoggedIn ? [
                 width: 280px;
                 height: calc(100vh - 60px);
                 background: white;
-                box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+                box-shadow: 2px 0 16px rgba(0, 0, 0, 0.08);
                 transition: left 0.3s ease;
                 z-index: 999;
                 overflow-y: auto;
@@ -631,21 +638,26 @@ $userData = $isLoggedIn ? [
             .nav-list {
                 flex-direction: column;
                 gap: 0;
-                padding: 1rem 0;
+                padding: 0.5rem 0;
             }
             
             .nav-item {
                 width: 100%;
-                border-bottom: 1px solid #e2e8f0;
             }
             
             .nav-link {
                 width: 100%;
-                padding: 1rem 1.5rem;
+                padding: 1.2rem 1.5rem;
                 flex-direction: row;
                 justify-content: flex-start;
+                align-items: center;
                 gap: 1rem;
                 border-radius: 0;
+                background: transparent;
+                border: none;
+                border-left: 3px solid transparent;
+                transition: all 0.2s ease;
+                position: relative;
             }
             
             .nav-link::before,
@@ -654,19 +666,38 @@ $userData = $isLoggedIn ? [
             }
             
             .nav-link:hover {
-                background: #f0f9ff;
+                background: rgba(200, 16, 46, 0.1);
+                border-left-color: #C8102E;
                 transform: none;
                 box-shadow: none;
             }
-            
+
+            .nav-link.active {
+                background: rgba(37, 99, 235, 0.1);
+                border-left-color: #2563eb;
+            }
+
             .nav-number {
-                font-size: 0.9rem;
-                min-width: 30px;
+                font-size: 0.85rem;
+                font-weight: 600;
+                color: #2563eb; /* Xanh mặc định */
+                min-width: 24px;
+            }
+
+            .nav-text {
+                font-size: 1rem;
+                font-weight: 500;
+                letter-spacing: 0;
+                color: #2563eb; /* Xanh mặc định */
+                flex: 1;
+            }
+
+            .nav-link:hover .nav-text {
+                color: #C8102E; /* Đỏ khi hover */
             }
             
-            .nav-text {
-                font-size: 0.95rem;
-                letter-spacing: 0.5px;
+            .nav-link:hover .nav-number {
+                color: #C8102E; /* Đỏ khi hover */
             }
             
             .action-btn, .btn-login, .lang-toggle-btn, .user-avatar-btn {
@@ -1004,7 +1035,7 @@ $userData = $isLoggedIn ? [
 
         /* Active state - enhance visibility */
         .nav-link.active {
-            background: linear-gradient(135deg, rgba(14, 165, 233, 0.12) 0%, rgba(6, 182, 212, 0.15) 100%);
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.12) 0%, rgba(200, 16, 46, 0.12) 100%);
         }
     
         /* Custom Language Toggle Button */
@@ -1017,9 +1048,9 @@ $userData = $isLoggedIn ? [
             align-items: center;
             justify-content: center;
             background: transparent;
-            border: 2px solid rgba(56, 189, 248, 0.3);
-            border-radius: 50%; /* Changed to circular */
-            color: #0ea5e9;
+            border: 2px solid rgba(37, 99, 235, 0.3);
+            border-radius: 8px; /* Bỏ bo tròn */
+            color: #2563eb; /* Xanh mặc định */
             text-decoration: none;
             font-size: 0.85rem;
             font-weight: 700;
@@ -1038,10 +1069,10 @@ $userData = $isLoggedIn ? [
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
+            background: rgba(200, 16, 46, 0.1); /* Đỏ nhạt khi hover */
             opacity: 0;
             transition: all 0.3s ease;
-            border-radius: 50%; /* Changed to circular */
+            border-radius: 8px; /* Bỏ bo tròn */
         }
         
         .lang-toggle-btn:hover::before {
@@ -1049,10 +1080,10 @@ $userData = $isLoggedIn ? [
         }
         
         .lang-toggle-btn:hover {
-            border-color: #0ea5e9;
-            color: white;
+            border-color: #C8102E;
+            color: #C8102E; /* Đỏ khi hover */
             transform: translateY(-3px) scale(1.08);
-            box-shadow: 0 8px 20px rgba(14, 165, 233, 0.25);
+            box-shadow: 0 8px 20px rgba(200, 16, 46, 0.25);
         }
         
         .lang-toggle-btn span {
@@ -1072,7 +1103,7 @@ $userData = $isLoggedIn ? [
             <!-- Logo -->
             <div class="logo-section">
                 <a href="<?php echo buildLangUrl('/'); ?>" class="logo-link">
-                    <img src="<?php echo defined('IMAGES_PATH') ? IMAGES_PATH : '/assets/images/'; ?>logo.png" alt="VNMaterial" class="logo">
+                    <img src="<?php echo $logoPath; ?>?v=<?php echo $logoVersion; ?>" alt="VNMaterial" class="logo">
                 </a>
             </div>
 
@@ -1087,38 +1118,32 @@ $userData = $isLoggedIn ? [
             <nav class="main-nav" id="mainNav">
                 <ul class="nav-list">
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('materials.php'); ?>" class="nav-link">
-                            <span class="nav-number">01</span>
+                        <a href="<?php echo buildLangUrl('materials'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_materials'); ?></span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('equipment.php'); ?>" class="nav-link">
-                            <span class="nav-number">02</span>
+                        <a href="<?php echo buildLangUrl('equipment'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_equipment'); ?></span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('technology.php'); ?>" class="nav-link">
-                            <span class="nav-number">03</span>
+                        <a href="<?php echo buildLangUrl('technology'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_technology'); ?></span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('landscape.php'); ?>" class="nav-link">
-                            <span class="nav-number">04</span>
+                        <a href="<?php echo buildLangUrl('landscape'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_landscape'); ?></span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('suppliers.php'); ?>" class="nav-link">
-                            <span class="nav-number">05</span>
+                        <a href="<?php echo buildLangUrl('suppliers'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_suppliers'); ?></span>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?php echo buildLangUrl('news-modern.php'); ?>" class="nav-link">
-                            <span class="nav-number">06</span>
+                        <a href="<?php echo buildLangUrl('news-modern'); ?>" class="nav-link">
                             <span class="nav-text"><?php echo t('nav_news'); ?></span>
                         </a>
                     </li>
@@ -1149,12 +1174,12 @@ $userData = $isLoggedIn ? [
                             </div>
                             
                             <div class="user-dropdown-menu">
-                                <a href="<?php echo buildLangUrl('account.php'); ?>" class="user-dropdown-item">
+                                <a href="<?php echo buildLangUrl('account'); ?>" class="user-dropdown-item">
                                     <i class="fas fa-user"></i>
                                     <span><?php echo t('my_account'); ?></span>
                                 </a>
                                 <div class="user-dropdown-divider"></div>
-                                <a href="<?php echo buildLangUrl('logout.php'); ?>" class="user-dropdown-item">
+                                <a href="<?php echo buildLangUrl('logout'); ?>" class="user-dropdown-item">
                                     <i class="fas fa-sign-out-alt"></i>
                                     <span><?php echo t('logout'); ?></span>
                                 </a>
@@ -1163,7 +1188,7 @@ $userData = $isLoggedIn ? [
                     </div>
                 <?php else: ?>
                     <!-- Login Button (Not Logged In) -->
-                    <a href="<?php echo buildLangUrl('login.php'); ?>?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" 
+                    <a href="<?php echo buildLangUrl('login'); ?>?redirect=<?php echo urlencode($_SERVER['REQUEST_URI']); ?>" 
                        class="btn-login"
                        title="<?php echo t('login'); ?>"
                        aria-label="<?php echo t('login'); ?>">
@@ -1199,7 +1224,7 @@ $userData = $isLoggedIn ? [
                 </h2>
                 <p class="search-popup-desc">Nhập từ khóa để tìm sản phẩm, nhà cung cấp, bài viết...</p>
                 
-                <form action="<?php echo buildLangUrl('search.php'); ?>" method="GET" class="search-form">
+                <form action="<?php echo buildLangUrl('search'); ?>" method="GET" class="search-form">
                     <div class="search-input-wrapper">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" 
@@ -1218,11 +1243,11 @@ $userData = $isLoggedIn ? [
                 <div class="search-suggestions">
                     <p class="suggestions-title">Tìm kiếm phổ biến:</p>
                     <div class="suggestions-tags">
-                        <a href="<?php echo buildLangUrl('search.php'); ?>?q=xi%20măng" class="suggestion-tag">Xi măng</a>
-                        <a href="<?php echo buildLangUrl('search.php'); ?>?q=gạch%20ốp%20lát" class="suggestion-tag">Gạch ốp lát</a>
-                        <a href="<?php echo buildLangUrl('search.php'); ?>?q=sơn" class="suggestion-tag">Sơn</a>
-                        <a href="<?php echo buildLangUrl('search.php'); ?>?q=thép" class="suggestion-tag">Thép</a>
-                        <a href="<?php echo buildLangUrl('search.php'); ?>?q=cửa%20gỗ" class="suggestion-tag">Cửa gỗ</a>
+                        <a href="<?php echo buildLangUrl('search'); ?>?q=xi%20măng" class="suggestion-tag">Xi măng</a>
+                        <a href="<?php echo buildLangUrl('search'); ?>?q=gạch%20ốp%20lát" class="suggestion-tag">Gạch ốp lát</a>
+                        <a href="<?php echo buildLangUrl('search'); ?>?q=sơn" class="suggestion-tag">Sơn</a>
+                        <a href="<?php echo buildLangUrl('search'); ?>?q=thép" class="suggestion-tag">Thép</a>
+                        <a href="<?php echo buildLangUrl('search'); ?>?q=cửa%20gỗ" class="suggestion-tag">Cửa gỗ</a>
                     </div>
                 </div>
             </div>

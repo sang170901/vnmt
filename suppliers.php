@@ -1,15 +1,20 @@
 <?php 
 // Set proper encoding for Vietnamese
 header('Content-Type: text/html; charset=UTF-8');
-include 'inc/header-new.php'; 
-?>
 
-<?php
+require_once 'config.php';
+require_once 'lang/lang.php';
+require_once 'lang/db_translate_helper.php';
 require_once 'inc/db_frontend.php';
+require_once 'inc/supplier_helpers.php';
+require_once 'inc/url_helpers.php';
+require_once 'backend/inc/helpers.php';
+
+include 'inc/header-new.php';
 
 // Pagination and filter parameters
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$limit = 12;
+$limit = 40;
 $offset = ($page - 1) * $limit;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $category = isset($_GET['category']) ? trim($_GET['category']) : '';
@@ -18,39 +23,199 @@ try {
     $pdo = getFrontendPDO();
     
     // Build query with filters
-    $whereClause = "WHERE status = 1";
+    $whereClause = "WHERE s.status = 1";
     $params = [];
     
-    if (!empty($search)) {
-        $whereClause .= " AND (name LIKE :search OR description LIKE :search)";
-        $params[':search'] = "%$search%";
-    }
+    // Không dùng SQL LIKE cho tìm kiếm nữa - sẽ dùng PHP để lọc sau
+    // Vì SQL LIKE không hỗ trợ tìm không dấu (ví dụ: "da" không match với "đá" trong DB)
     
     if (!empty($category)) {
-        $whereClause .= " AND category_id = :category";
+        $whereClause .= " AND s.category_id = :category";
         $params[':category'] = $category;
     }
     
     // Get total count
-    $countQuery = "SELECT COUNT(*) as total FROM suppliers $whereClause";
+    $countQuery = "SELECT COUNT(*) as total FROM suppliers s LEFT JOIN categories c ON s.category_id = c.id $whereClause";
     $countStmt = $pdo->prepare($countQuery);
     $countStmt->execute($params);
     $totalItems = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
     $totalPages = ceil($totalItems / $limit);
     
-    // Get suppliers with pagination (join với categories)
-    $suppliersQuery = "SELECT s.*, c.name as category_name 
+    // Get suppliers with pagination (join với categories, include English)
+    $suppliersQuery = "SELECT s.*, s.name_en, s.description_en, c.name as category_name 
                       FROM suppliers s 
                       LEFT JOIN categories c ON s.category_id = c.id 
-                      $whereClause ORDER BY s.name ASC LIMIT :limit OFFSET :offset";
+                      $whereClause";
     $suppliersStmt = $pdo->prepare($suppliersQuery);
     foreach ($params as $key => $value) {
         $suppliersStmt->bindValue($key, $value);
     }
-    $suppliersStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-    $suppliersStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
     $suppliersStmt->execute();
-    $suppliers = $suppliersStmt->fetchAll(PDO::FETCH_ASSOC);
+    $allSuppliers = $suppliersStmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Sắp xếp theo độ liên quan nếu có search
+    if (!empty($search)) {
+        $searchLower = mb_strtolower(trim($search), 'UTF-8');
+        $searchNoAccent = mb_strtolower(removeVietnameseAccents($search), 'UTF-8');
+        $searchLength = mb_strlen($searchNoAccent);
+        
+        // Kiểm tra xem từ khóa có chứa dấu không
+        // Nếu từ khóa có dấu, chỉ tìm chính xác có dấu
+        // Nếu từ khóa không dấu, tìm cả có dấu và không dấu
+        $hasAccent = ($searchLower !== $searchNoAccent);
+        
+        // Tính điểm liên quan cho mỗi supplier và lọc kết quả
+        $filteredSuppliers = [];
+        foreach ($allSuppliers as &$supplier) {
+            $nameLower = mb_strtolower(trim($supplier['name']), 'UTF-8');
+            $nameNoAccent = mb_strtolower(removeVietnameseAccents($supplier['name']), 'UTF-8');
+            
+            $score = 0;
+            $matched = false;
+            
+            // Hàm kiểm tra match chính xác - chỉ match khi từ khóa là từ đầy đủ hoặc prefix hợp lý
+            $checkMatch = function($text, $searchTerm, $textOriginal = '', $requireAccentMatch = false) use ($searchLength, $hasAccent) {
+                // Tách thành các từ
+                $words = preg_split('/[\s\-_\.]+/', $text);
+                $wordsOriginal = !empty($textOriginal) ? preg_split('/[\s\-_\.]+/', $textOriginal) : [];
+                
+                foreach ($words as $idx => $word) {
+                    $word = trim($word);
+                    if (empty($word)) continue;
+                    
+                    $wordLength = mb_strlen($word);
+                    $wordOriginal = isset($wordsOriginal[$idx]) ? trim($wordsOriginal[$idx]) : '';
+                    
+                    // Nếu từ khóa có dấu và yêu cầu match có dấu, kiểm tra từ gốc
+                    if ($requireAccentMatch && $hasAccent && !empty($wordOriginal)) {
+                        $wordToCheck = $wordOriginal;
+                    } else {
+                        $wordToCheck = $word;
+                    }
+                    
+                    // Exact match
+                    if ($word === $searchTerm) {
+                        // Nếu từ khóa có dấu, chỉ match khi từ trong tên cũng có dấu tương ứng
+                        if ($hasAccent && $requireAccentMatch) {
+                            // Kiểm tra từ gốc có dấu
+                            if (!empty($wordOriginal) && mb_strtolower($wordOriginal, 'UTF-8') === mb_strtolower($searchTerm, 'UTF-8')) {
+                                if ($searchLength >= 2) {
+                                    return true;
+                                }
+                            }
+                        } else {
+                            // Từ khóa không dấu hoặc không yêu cầu match có dấu
+                            if ($searchLength >= 2) {
+                                return true;
+                            }
+                        }
+                        if ($wordLength < 2) {
+                            return true;
+                        }
+                        continue;
+                    }
+                    
+                    // Prefix match - từ khóa phải bắt đầu từ đầu từ
+                    if ($wordLength > $searchLength && mb_substr($word, 0, $searchLength) === $searchTerm) {
+                        // Nếu từ khóa có dấu, kiểm tra từ gốc có dấu
+                        if ($hasAccent && $requireAccentMatch && !empty($wordOriginal)) {
+                            $wordOriginalLower = mb_strtolower($wordOriginal, 'UTF-8');
+                            $searchTermLower = mb_strtolower($searchTerm, 'UTF-8');
+                            if (mb_strlen($wordOriginalLower) > mb_strlen($searchTermLower) && 
+                                mb_substr($wordOriginalLower, 0, mb_strlen($searchTermLower)) === $searchTermLower) {
+                                if (($wordLength - $searchLength) >= 2) {
+                                    return true;
+                                }
+                            }
+                        } else {
+                            // Chỉ match nếu từ dài hơn từ khóa ít nhất 2 ký tự
+                            if (($wordLength - $searchLength) >= 2) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            };
+            
+            // Nếu từ khóa có dấu, chỉ tìm chính xác có dấu
+            if ($hasAccent) {
+                // Exact match (có dấu)
+                if ($nameLower === $searchLower && $searchLength >= 2) {
+                    $score = 1000;
+                    $matched = true;
+                }
+                // Starts with (có dấu)
+                elseif ($searchLength >= 2 && strpos($nameLower, $searchLower) === 0) {
+                    $score = 500;
+                    $matched = true;
+                }
+                // Match trong từ (có dấu)
+                elseif ($checkMatch($nameLower, $searchLower, $nameLower, true)) {
+                    $score = 100;
+                    $matched = true;
+                }
+            } else {
+                // Từ khóa không dấu, tìm cả có dấu và không dấu
+                // Ưu tiên match không dấu trước
+                
+                // Exact match (không dấu)
+                if ($nameNoAccent === $searchNoAccent && $searchLength >= 2) {
+                    $score = 1000;
+                    $matched = true;
+                }
+                // Starts with (không dấu)
+                elseif ($searchLength >= 2 && strpos($nameNoAccent, $searchNoAccent) === 0) {
+                    $score = 500;
+                    $matched = true;
+                }
+                // Match trong từ (không dấu)
+                elseif ($checkMatch($nameNoAccent, $searchNoAccent, $nameLower, false)) {
+                    $score = 100;
+                    $matched = true;
+                }
+            }
+            
+            // Chỉ thêm vào kết quả nếu có match trong tên
+            if ($matched) {
+                $supplier['_relevance_score'] = $score;
+                $filteredSuppliers[] = $supplier;
+            }
+        }
+        unset($supplier);
+        
+        // Sắp xếp theo điểm liên quan (cao -> thấp), sau đó theo tên
+        usort($filteredSuppliers, function($a, $b) {
+            if ($a['_relevance_score'] != $b['_relevance_score']) {
+                return $b['_relevance_score'] - $a['_relevance_score'];
+            }
+            return strcmp($a['name'], $b['name']);
+        });
+        
+        // Áp dụng pagination sau khi sort
+        $suppliers = array_slice($filteredSuppliers, $offset, $limit);
+        
+        // Xóa score tạm thời
+        foreach ($suppliers as &$supplier) {
+            unset($supplier['_relevance_score']);
+        }
+        unset($supplier);
+        
+        // Cập nhật totalItems sau khi filter
+        $totalItems = count($filteredSuppliers);
+        $totalPages = ceil($totalItems / $limit);
+    } else {
+        // Không có search, lấy theo pagination bình thường
+        $suppliersQuery .= " ORDER BY s.name ASC LIMIT :limit OFFSET :offset";
+        $suppliersStmt = $pdo->prepare($suppliersQuery);
+        foreach ($params as $key => $value) {
+            $suppliersStmt->bindValue($key, $value);
+        }
+        $suppliersStmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $suppliersStmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $suppliersStmt->execute();
+        $suppliers = $suppliersStmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
     // Get categories (lấy từ bảng categories)
     $categoriesQuery = "SELECT id, name FROM categories ORDER BY name";
@@ -153,75 +318,149 @@ try {
         
         /* hero stats removed as requested */
         
-        .search-section {
+        /* Category Filter Pills - Like News */
+        .category-filter {
             background: white;
-            border-radius: 20px;
-            padding: 2rem;
-            margin: -60px auto 0;
-            max-width: 1000px; /* wider search box */
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: -60px auto 2rem;
+            max-width: 1280px;
             position: relative;
             z-index: 10;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-            margin-bottom: 4rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
         }
         
-        .search-form {
+        .filter-header {
             display: flex;
-            gap: 1rem;
             align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.2rem;
             flex-wrap: wrap;
+            gap: 1rem;
+        }
+        
+        .filter-title {
+            font-size: 0.875rem;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .search-box {
+            position: relative;
+            display: flex;
+            flex: 1;
+            max-width: 450px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
         }
         
         .search-input {
             flex: 1;
-            min-width: 300px;
-            padding: 1rem 1.5rem;
-            border: 2px solid #60a5fa;
+            padding: 0.875rem 1.25rem;
+            padding-right: 3.5rem;
+            border: 2px solid #e0f2fe;
             border-radius: 12px;
-            font-size: 1rem;
-            transition: all 0.3s;
-            background: #f8fafc;
+            font-size: 0.9375rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: white;
         }
         
         .search-input:focus {
             outline: none;
-            border-color: #64b5f6;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(100,181,246,0.12);
+            border-color: #3b82f6;
+            box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+            transform: translateY(-2px);
         }
         
-        .category-select {
-            padding: 1rem 1.5rem;
-            border: 2px solid #e3f2fd;
-            border-radius: 12px;
-            font-size: 1rem;
-            background: #f8fafc;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .category-select:focus {
-            outline: none;
-            border-color: #64b5f6;
-            background: white;
+        .search-input::placeholder {
+            color: #94a3b8;
         }
         
         .search-btn {
-            background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
             border: none;
-            padding: 1rem 2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
+            border-radius: 50%;
             font-size: 1rem;
-            box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .search-btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-50%) scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
 
-        .search-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(66, 165, 245, 0.4);
+        .search-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
+
+        .search-btn i {
+            font-size: 1rem;
+        }
+        
+        .category-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+        
+        .category-pill {
+            padding: 0.625rem 1.25rem;
+            background: #f1f5f9;
+            color: #64748b;
+            border: 2px solid transparent;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+        
+        .category-pill:hover {
+            background: #e0f2fe;
+            color: #2563eb;
+            border-color: #3b82f6;
+        }
+        
+        .category-pill.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            border-color: #3b82f6;
+        }
+        
+        .category-pill .count {
+            background: rgba(255,255,255,0.25);
+            padding: 0.125rem 0.5rem;
+            border-radius: 50px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+        
+        .category-pill.active .count {
+            background: rgba(255,255,255,0.3);
         }
         
         .main-content {
@@ -232,10 +471,10 @@ try {
         
         .suppliers-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* 4 cards per row on desktop */
+            grid-template-columns: repeat(4, 1fr);
             gap: 1.25rem;
             margin-bottom: 2.5rem;
-            align-items: stretch; /* ensure grid items stretch to same height */
+            align-items: stretch;
         }
         
         .supplier-card {
@@ -249,7 +488,8 @@ try {
             padding: 0;
             display: flex;
             flex-direction: column;
-            height: 100%; /* allow equal height via grid align-items */
+            height: 100%;
+            cursor: pointer;
         }
         
         .supplier-card:hover {
@@ -257,91 +497,135 @@ try {
             box-shadow: 0 20px 60px rgba(0,0,0,0.15);
         }
         
+        .supplier-header-link {
+            display: block;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+        
+        .supplier-header-link:hover .supplier-header {
+            transform: scale(1.05);
+        }
+        
         .supplier-header {
-            padding: 1.25rem 1rem 0.75rem;
-            background: linear-gradient(135deg, #f8fafc 0%, #eef8ff 100%);
+            padding: 20px 20px 10px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f0f9ff 100%);
             position: relative;
-            display:flex;
-            align-items:center;
-            justify-content:center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 160px;
+            overflow: hidden;
+            transition: all 0.3s ease;
         }
         
         .supplier-logo {
-            width: 56px;
-            height: 56px;
-            border-radius: 12px;
-            object-fit: cover;
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
             display: block;
-            border: 3px solid white;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            cursor: pointer;
+            margin: 0 auto;
+            padding: 12px;
+        }
+        
+        .supplier-logo-wrapper {
+            width: 85px;
+            height: 85px;
+            background: white;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .supplier-logo-placeholder {
+            width: 85px;
+            height: 85px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         
         .supplier-category {
             position: absolute;
-            top: 1rem;
-            right: 1rem;
+            top: 0.9rem;
+            right: 0.9rem;
             background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
             color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
+            padding: 0.45rem 0.9rem;
+            border-radius: 18px;
+            font-size: 0.72rem;
             font-weight: 600;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.45px;
             box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
         }
         
-        .supplier-body {
-            padding: 1rem 1rem 1rem;
-            flex: 1 1 auto; /* allow body to grow and push footer down */
-            display: flex;
-            flex-direction: column;
-        }
-        
         .supplier-name {
-            font-size: 1.05rem;
+            font-size: 0.9rem;
             font-weight: 700;
             color: #1e293b;
-            margin-bottom: 0.35rem;
+            margin-top: 8px;
             text-align: center;
-        }
-        
-        .supplier-description {
-            color: #64748b;
-            margin-bottom: 0.9rem;
-            line-height: 1.4;
-            text-align: center;
-            font-size: 0.88rem;
-            /* clamp description to two lines and show ellipsis */
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            line-height: 1.4;
+        }
+        
+        .supplier-body {
+            padding: 0.9rem 0.9rem 0.9rem;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
         }
         
         .supplier-details {
-            space-y: 0.8rem;
+            space-y: 0.4rem;
+            min-height: auto;
+            margin-bottom: 0;
         }
         
         .supplier-detail {
             display: flex;
-            align-items: center;
-            gap: 0.8rem;
+            align-items: flex-start;
+            gap: 0.6rem;
             color: #475569;
-            font-size: 0.9rem;
-            margin-bottom: 0.8rem;
+            font-size: 0.765rem;
+            margin-bottom: 0.4rem;
         }
         
         .supplier-detail i {
-            width: 16px;
+            width: 14px;
             color: #42a5f5;
-            font-size: 1rem;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        
+        .supplier-detail span {
+            flex: 1;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            line-height: 1.35;
         }
         
         .supplier-footer {
-            padding: 0.75rem 1rem 1rem;
+            padding: 0.9rem;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             flex-shrink: 0;
         }
@@ -349,16 +633,18 @@ try {
         .view-supplier {
             background: linear-gradient(135deg, #42a5f5 0%, #64b5f6 100%);
             color: white;
-            padding: 0.55rem 0.9rem;
-            border-radius: 10px;
+            padding: 0.6rem 1.2rem;
+            border-radius: 9px;
             text-decoration: none;
             font-weight: 600;
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             transition: all 0.22s;
             display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.5rem;
             box-shadow: 0 2px 8px rgba(66, 165, 245, 0.3);
+            width: 100%;
+            justify-content: center;
         }
 
         .view-supplier:hover {
@@ -366,12 +652,6 @@ try {
             box-shadow: 0 4px 15px rgba(66, 165, 245, 0.4);
             text-decoration: none;
             color: white;
-        }
-        
-        .supplier-date {
-            color: #94a3b8;
-            font-size: 0.8rem;
-            font-weight: 500;
         }
         
         .pagination {
@@ -436,20 +716,61 @@ try {
             .suppliers-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            .filter-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: 100%;
+            }
         }
 
         @media (max-width: 560px) {
             .suppliers-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .search-box {
+                max-width: 100%;
+            }
+
+            .search-input {
+                font-size: 1rem;
+            }
+            
+            .search-btn {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .category-pill {
+                flex: 1 1 calc(50% - 0.375rem);
+                justify-content: center;
+            }
 
             .hero-title {
                 font-size: 2rem;
             }
 
-            .supplier-logo {
-                width: 64px;
-                height: 64px;
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .supplier-header {
+                min-height: 140px;
+                padding: 15px 15px 8px;
+            }
+
+            .supplier-logo-wrapper {
+                width: 70px;
+                height: 70px;
+            }
+            
+            .supplier-logo-placeholder {
+                width: 70px;
+                height: 70px;
             }
         }
     </style>
@@ -467,28 +788,56 @@ try {
         </div>
     </section>
 
-    <!-- Search Section -->
+    <!-- Category Filter Pills - Like News -->
     <div class="main-content">
-        <div class="search-section">
-            <form method="GET" class="search-form">
-                <input type="text" name="search" class="search-input" 
-                       placeholder="Tìm kiếm nhà cung cấp..." 
-                       value="<?php echo htmlspecialchars($search); ?>">
+        <div class="category-filter">
+            <div class="filter-header">
+                <span class="filter-title">
+                    <i class="fas fa-tags"></i> DANH MỤC
+                </span>
+                <form method="GET" action="suppliers.php" class="search-box">
+                    <input type="text" 
+                           name="search" 
+                           class="search-input" 
+                           placeholder="<?php echo t('suppliers_search_placeholder'); ?>" 
+                           value="<?php echo htmlspecialchars($search); ?>">
+                    <?php if (!empty($category)): ?>
+                        <input type="hidden" name="category" value="<?php echo htmlspecialchars($category); ?>">
+                    <?php endif; ?>
+                    <button type="submit" class="search-btn" title="Tìm kiếm">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </form>
+            </div>
+            
+            <div class="category-pills">
+                <!-- All categories pill -->
+                <a href="suppliers.php<?php echo !empty($search) ? '?search=' . urlencode($search) : ''; ?>" 
+                   class="category-pill <?php echo empty($category) ? 'active' : ''; ?>">
+                    <i class="fas fa-th"></i>
+                    <span>Tất cả</span>
+                    <span class="count"><?php echo $totalItems; ?></span>
+                </a>
                 
-                <select name="category" class="category-select">
-                    <option value="">Tất cả danh mục</option>
-                    <?php foreach ($categories as $cat): ?>
-                        <option value="<?php echo htmlspecialchars($cat['id']); ?>" 
-                                <?php echo ($category == $cat['id']) ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($cat['name']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
+                <?php 
+                // Count suppliers per category
+                $categoryCounts = [];
+                $stmt = $pdo->query("SELECT category_id, COUNT(*) as count FROM suppliers WHERE status = 1 AND category_id IS NOT NULL GROUP BY category_id");
+                while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $categoryCounts[$row['category_id']] = $row['count'];
+                }
                 
-                <button type="submit" class="search-btn">
-                    <i class="fas fa-search"></i> Tìm kiếm
-                </button>
-            </form>
+                foreach ($categories as $cat): 
+                    $count = isset($categoryCounts[$cat['id']]) ? $categoryCounts[$cat['id']] : 0;
+                    if ($count == 0) continue; // Skip categories with 0 suppliers
+                ?>
+                <a href="suppliers.php?category=<?php echo urlencode($cat['id']); ?><?php echo !empty($search) ? '&search=' . urlencode($search) : ''; ?>" 
+                   class="category-pill <?php echo $category == $cat['id'] ? 'active' : ''; ?>">
+                    <span><?php echo htmlspecialchars($cat['name']); ?></span>
+                    <span class="count"><?php echo $count; ?></span>
+                </a>
+                <?php endforeach; ?>
+            </div>
         </div>
 
         <!-- Results -->
@@ -520,25 +869,35 @@ try {
         <?php if (!empty($suppliers)): ?>
             <div class="suppliers-grid">
                 <?php foreach ($suppliers as $supplier): ?>
-                    <div class="supplier-card">
+                    <div class="supplier-card" onclick="window.location.href='<?php echo buildSupplierUrl($supplier); ?>'">
                         <?php if (!empty($supplier['category_name'])): ?>
                             <div class="supplier-category">
                                 <?php echo htmlspecialchars($supplier['category_name']); ?>
                             </div>
                         <?php endif; ?>
                         
-                        <div class="supplier-header">
-                            <img src="<?php echo htmlspecialchars($supplier['logo'] ?: 'https://via.placeholder.com/80x80/667eea/ffffff?text=' . urlencode(substr($supplier['name'], 0, 2))); ?>" 
-                                 alt="<?php echo htmlspecialchars($supplier['name']); ?>" 
-                                 class="supplier-logo">
-                        </div>
+                        <a href="<?php echo buildSupplierUrl($supplier); ?>" class="supplier-header-link" onclick="event.stopPropagation();">
+                            <div class="supplier-header">
+                                <?php 
+                                $logoPath = getSupplierLogoPath($supplier['logo'] ?? null);
+                                if ($logoPath): 
+                                ?>
+                                    <div class="supplier-logo-wrapper">
+                                        <img src="<?php echo htmlspecialchars($logoPath); ?>" 
+                                             alt="<?php echo htmlspecialchars(getTranslatedName($supplier)); ?>" 
+                                             class="supplier-logo"
+                                             onerror="this.onerror=null; var placeholder=document.createElement('div');placeholder.className='supplier-logo-placeholder';placeholder.style.cssText='background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%); display: flex; align-items: center; justify-content: center; width: 85px; height: 85px; margin: 0 auto 12px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08);';placeholder.innerHTML='<i class=\'fas fa-building\' style=\'color: white; font-size: 1.75rem; opacity: 0.7;\'></i>';this.parentNode.replaceChild(placeholder, this);">
+                                    </div>
+                                <?php else: ?>
+                                    <div class="supplier-logo-placeholder" style="background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);">
+                                        <i class="fas fa-building" style="color: white; font-size: 1.75rem; opacity: 0.7;"></i>
+                                    </div>
+                                <?php endif; ?>
+                                <h3 class="supplier-name"><?php echo htmlspecialchars(getTranslatedName($supplier)); ?></h3>
+                            </div>
+                        </a>
                         
                         <div class="supplier-body">
-                            <h3 class="supplier-name"><?php echo htmlspecialchars($supplier['name']); ?></h3>
-                            <p class="supplier-description">
-                                <?php echo htmlspecialchars(substr($supplier['description'] ?? 'Nhà cung cấp uy tín với nhiều năm kinh nghiệm', 0, 120)); ?>
-                                <?php if (strlen($supplier['description'] ?? '') > 120): ?>...<?php endif; ?>
-                            </p>
                             
                             <div class="supplier-details">
                                 <?php if ($supplier['address']): ?>
@@ -565,13 +924,10 @@ try {
                         </div>
                         
                         <div class="supplier-footer">
-                            <a href="supplier-detail.php?id=<?php echo $supplier['id']; ?>" class="view-supplier">
+                            <a href="<?php echo buildSupplierUrl($supplier); ?>" class="view-supplier" onclick="event.stopPropagation();">
                                 <span>Xem chi tiết</span>
                                 <i class="fas fa-arrow-right"></i>
                             </a>
-                            <span class="supplier-date">
-                                <?php echo date('d/m/Y', strtotime($supplier['created_at'])); ?>
-                            </span>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -610,10 +966,10 @@ try {
         <?php else: ?>
             <div class="no-results">
                 <i class="fas fa-building"></i>
-                <h3>Không tìm thấy nhà cung cấp</h3>
-                <p>Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc danh mục</p>
+                <h3><?php echo t('suppliers_not_found'); ?></h3>
+                <p><?php echo t('suppliers_not_found_hint'); ?></p>
                 <a href="suppliers.php" style="color: #667eea; text-decoration: none; font-weight: 600;">
-                    ← Xem tất cả nhà cung cấp
+                    ← <?php echo t('suppliers_view_all'); ?>
                 </a>
             </div>
         <?php endif; ?>

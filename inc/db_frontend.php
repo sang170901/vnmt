@@ -1,10 +1,16 @@
 <?php
 // Database connection for frontend (supplier pages)
+
 function getFrontendPDO() {
-    $host = 'localhost';
-    $dbname = 'vnmt_db';
-    $username = 'root';
-    $password = '';
+    // Đọc cấu hình DB dùng chung
+    $envConfig = require __DIR__ . '/../db_env.php';
+    $mode = $envConfig['mode'] ?? 'local';
+    $dbConfig = $envConfig[$mode] ?? $envConfig['local'];
+
+    $host = $dbConfig['db_host'] ?? 'localhost';
+    $dbname = $dbConfig['db_name'] ?? 'vnmt_db';
+    $username = $dbConfig['db_user'] ?? 'root';
+    $password = $dbConfig['db_password'] ?? '';
     
     try {
         $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);

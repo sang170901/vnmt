@@ -1,0 +1,445 @@
+<!DOCTYPE html><!-- This site was created in Webflow. https://webflow.com --><!-- Last Published: Tue Dec 16 2025 12:51:51 GMT+0000 (Coordinated Universal Time) --><html data-wf-domain="www.i-mesh.eu" data-wf-page="6661b8d344f252d8c9d3b4fe" data-wf-site="663b32b87469cb70d54ecd88" lang="en"><head><meta charset="utf-8"/><title>Not Found</title><link rel="alternate" hrefLang="x-default" href="https://%%PUBLISH_URL_REPLACEMENT%%/404"/><link rel="alternate" hrefLang="en" href="https://%%PUBLISH_URL_REPLACEMENT%%/404"/><link rel="alternate" hrefLang="it" href="https://%%PUBLISH_URL_REPLACEMENT%%/it/404"/><link rel="alternate" hrefLang="ja" href="https://%%PUBLISH_URL_REPLACEMENT%%/ja/404"/><meta content="Not Found" property="og:title"/><meta content="Not Found" property="twitter:title"/><meta content="width=device-width, initial-scale=1" name="viewport"/><meta content="Webflow" name="generator"/><link href="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/css/i-mesh-2024-7aed53.webflow.shared.79a200ace.css" rel="stylesheet" type="text/css"/><script src="https://use.typekit.net/kbd3jno.js" type="text/javascript"></script><script type="text/javascript">try{Typekit.load();}catch(e){}</script><script type="text/javascript">!function(o,c){var n=c.documentElement,t=" w-mod-";n.className+=t+"js",("ontouchstart"in o||o.DocumentTouch&&c instanceof DocumentTouch)&&(n.className+=t+"touch")}(window,document);</script><link href="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/66a25c1ff9b5f0a389f38b02_5d161ff5d72b7fae99718340_Logo_i-Meshfavi.png" rel="shortcut icon" type="image/x-icon"/><link href="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/66a25c247c7d8a1d1e7425d0_5d161ffa099ac31fb5b6f1e5_Logo_i-Meshwebm.png" rel="apple-touch-icon"/><script async="" src="https://www.googletagmanager.com/gtag/js?id=G-SZLJZ8ZVMZ"></script><script type="text/javascript">window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('set', 'developer_id.dZGVlNj', true);gtag('js', new Date());gtag('config', 'G-SZLJZ8ZVMZ');</script><script src="https://www.google.com/recaptcha/api.js" type="text/javascript"></script>
+<script type="text/javascript">
+  var acceptButtonCaption = "";
+var content = "";
+var customizeButtonCaption = "";
+var rejectButtonCaption = "";
+var cookiePolicyId = "";
+var lang = document.documentElement.lang;
+
+console.log("lang", lang);
+
+    switch (lang) {
+        case 'en':
+            var policy_id = 40588314; // policy_id dal codice di integrazione di iubenda (EN)
+        	
+            break;
+        case 'it':
+            var policy_id = 73021051; // policy_id dal codice di integrazione di iubenda (IT)
+            break;
+        // case 'altra lingua' ...
+    }
+  
+  
+    var _iub = _iub || [];
+    _iub.csConfiguration = {"siteId":3720797,"cookiePolicyId":policy_id,"lang":lang,"banner":{"applyStyles": false}};
+    </script>
+    <script type="text/javascript" src="https://cs.iubenda.com/autoblocking/3720797.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/gpp/stub.js"></script>
+    <script type="text/javascript" src="//cdn.iubenda.com/cs/iubenda_cs.js" charset="UTF-8" async></script>
+    
+
+<style>
+  /*
+.sub-menu.active {
+display: block;
+}
+  
+  .sub-menu.active ~ .nav-link.primary {
+    border: 1px solid black;
+}
+
+.menu-mobile-wrapper.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.menu-mobile-wrapper.translated {
+    transform: translate(-100%);
+}
+
+
+.menu-moblie-list-item.has-sub-menu[open] .sub-menu {
+    transform: translate(100%);
+}
+
+  
+.menu-mobile-wrapper .nav-link.sub-menu-item,
+.menu-mobile-wrapper .nav-link.pills {
+   
+}
+  
+@media screen and (max-width: 992px) {
+  .header#header[open] .menu-icon,
+.header#header[open] .lang .nav-link,
+.header#header[open] .nav-link.sub-menu-item,
+.header#header[open] .nav-link.pills {
+  filter: none;
+  color: inherit;
+}
+}
+  */
+  
+
+input:not([type='checkbox']) {
+  -webkit-appearance: none;
+	border-radius: 0;
+}
+
+  select {
+    border-radius: 0;
+  }
+  
+.cta, .cta-2 {
+  border-radius: 21px !important;
+  }
+  
+  .input-field-v4 {
+    border-radius: 10px !important;
+  }
+  
+  
+
+.menu-wrapper[open] {
+transform: translate3d(0px, 0px, 0px) scale3d(1, 1, 1) rotateX(0deg) rotateY(0deg) rotateZ(0deg) skew(0deg, 0deg) !important;
+}
+
+  
+  
+  header.transparent .w-locales-item .nav-link {
+    color: black !important;
+    filter:invert(0) !important;
+    text-transform: uppercase;
+  }
+  
+  @media only screen and (max-width: 479px) {
+header[menu-open] .search-opern,
+header[menu-open] .nav-link {
+filter: invert(0) !important;
+}
+
+}
+  
+</style>
+
+
+
+<style>
+.header .nav-link,
+.footer .nav-link{
+		display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.header .nav-link:hover,
+.footer .nav-link:hover{
+	font-weight: 700;
+}
+
+.header .nav-link::after,
+.footer .nav-link::after{
+  content: attr(data-text);
+  content: attr(data-text) / "";
+  height: 0;
+  visibility: hidden;
+  overflow: hidden;
+  user-select: none;
+  pointer-events: none;
+  font-weight: 700;
+
+  @media speech {
+    display: none;
+  }
+}
+
+
+a#behindLink {
+    text-transform: none !important;
+}
+  
+  @media screen and (min-width: 992px) and (max-width: 1150px) {
+.div-block-4 {
+    width: auto;
+    max-width: none;
+    padding-left: 2rem;
+}
+}
+    
+</style>
+
+
+
+
+<style type="text/css">
+  #iubenda-cs-banner {
+position: fixed;
+bottom: 0;
+left: 0;
+right: 0;
+background-color: white;
+z-index: 99999999;
+padding: 1rem 1rem 1rem 1.5rem;
+}
+  
+  
+
+.iubenda-cs-rationale {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+}
+  
+  
+  .iubenda-banner-content.iubenda-custom-content {
+    display: flex;
+    align-items: center;
+  }
+ 
+  @media screen and (max-width: 759px) {
+    .iubenda-cs-rationale {
+      flex-direction: column;
+    }
+    
+    .iubenda-cs-opt-group {
+      align-items: flex-start !important;
+    }
+    
+   
+  }
+  
+
+.iubenda-cs-opt-group {
+    display: flex;
+    flex-direction: column-reverse;
+    row-gap: 0.5rem;
+    justify-content: flex-end;
+    padding-top: 0.3rem;
+    align-items: center;
+}
+
+.iubenda-cs-opt-group-consent {
+    display: flex;
+    justify-content: flex-end;
+    column-gap: 1rem;
+}
+
+div#iubenda-cs-paragraph {
+  max-width: 56em;
+  line-height: 1.2rem;
+  padding-right: 3rem;
+}
+
+button.iubenda-cs-accept-btn.iubenda-cs-btn-primary,
+button.iubenda-cs-reject-btn.iubenda-cs-btn-primary,
+.iubenda-cs-customize-btn {
+    text-transform: uppercase;
+    padding-left: 9px;
+    padding-right: 9px;
+    border: 1px solid var(--white);
+    letter-spacing: .1px;
+    background-color: rgba(0, 0, 0, 0);
+    border-radius: 15px;
+    padding: 3px 9px;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 18px;
+    text-decoration: none;
+    display: inline-block;
+}
+  
+button.iubenda-cs-accept-btn.iubenda-cs-btn-primary {
+    color: white;
+    text-transform: uppercase;
+    background-color: black;
+  	padding-top: 3px;
+    padding-bottom: 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+button.iubenda-cs-reject-btn.iubenda-cs-btn-primary {
+    color: black;
+    
+}
+
+
+
+.iubenda-cs-customize-btn {
+  text-transform: none;
+  text-decoration: underline;
+  text-align: end;
+  padding-left: 0px;
+  font-size: 14px;
+}
+
+.iubenda-cs-customize-btn:hover {
+  
+}
+
+button.iubenda-cs-accept-btn.iubenda-cs-btn-primary:hover,
+button.iubenda-cs-reject-btn.iubenda-cs-btn-primary:hover {
+  
+}
+
+@media screen and (max-width: 989px) {
+  div#iubenda-cs-paragraph {
+    max-width: 30em;
+  }
+}
+
+
+@media screen and (max-width: 749px) {
+  div#iubenda-cs-paragraph {
+    max-width: none;
+  }
+}
+  
+  a.iubenda-cs-preferences-link {
+    text-decoration: none;
+    color: black;
+}
+  
+  .iub__us-widget {
+    display: none;
+  }
+  
+  button.iubenda-tp-btn.iubenda-cs-preferences-link {
+    display: none;
+  }
+
+  @media screen and (max-width: 990px) {
+    #iubenda-cs-banner {
+      padding: 1rem;
+    }
+    
+    .iubenda-cs-opt-group-consent {
+       justify-content: flex-start;
+       margin-top: 0.5rem;
+       flex-direction: row-reverse;
+    }
+  }
+
+  .nav-link.sub-menu-item.softness.black  {
+color: black !important;
+}
+  
+  
+
+ header .list-8::-webkit-scrollbar,
+ header .navigation-3::-webkit-scrollbar {
+  display: none;
+  }
+
+</style>
+
+<meta name="msvalidate.01" content="6C1751E382442772519B4C51758CC02C" />
+
+<script data-cmp-ab="2" src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
+
+<!-- SCRIPT PER POPUP -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const storageKey = "popupClosedUntil";
+  const now = new Date();
+
+  // Controlla se il popup è già stato chiuso per 5 giorni
+  const closedUntil = localStorage.getItem(storageKey);
+  if (closedUntil && new Date(closedUntil) > now) {
+    return;
+  }
+
+  // Attendi 3 secondi prima di cercare il popup (così diamo tempo anche al DOM di caricarlo completamente)
+  setTimeout(() => {
+    const popup = document.querySelector(".popup-container");
+    if (!popup) return; // esce se il popup non esiste in questa pagina
+
+    popup.style.display = "flex";
+
+    const closeBtn = popup.querySelector(".press-close");
+    closeBtn?.addEventListener("click", () => {
+      popup.style.display = "none";
+
+      const hideUntil = new Date();
+      hideUntil.setDate(hideUntil.getDate() + 0);
+      localStorage.setItem(storageKey, hideUntil.toISOString());
+    });
+  }, 3000);
+});
+</script></head><body><header class="header flex transparent"><div class="left-header-3"><div id="openMenuBtn" class="menu-button-2 w-node-_34a11a76-476f-b16c-fae0-21b0a8704ce9-a8704ce7"><img loading="lazy" src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/663cc8629676e6a72ac8289c_menu-open.png" alt="" class="menu-icon open"/></div><a href="/" class="logo-link-container w-inline-block"><img loading="lazy" src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/663b3bdde5209d710f321bf9_5c9a1bb2f7d06dba12d9a1e0_Logo_i-Mesh.png" alt="" class="image-92"/></a></div><div class="right-header"><ul role="list" class="header-list right w-list-unstyled"><li class="list-item search-list-item"><div data-w-id="34a11a76-476f-b16c-fae0-21b0a8704cf0" class="search-opern"><img loading="lazy" src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/663cf59138d3a7666f3698f9_search-icon.png" alt="" class="image-93 primary"/></div><form action="/search" data-w-id="34a11a76-476f-b16c-fae0-21b0a8704cf2" class="search w-form"><div class="div-block-198"><input class="search-input-5 w-input" maxlength="256" name="query" placeholder="search" type="search" id="search" required=""/><input type="submit" class="nav-link pills search-button w-button" value="SEARCH"/></div><div data-w-id="06fcfa81-c706-ffb5-2bf4-0609697a811f" class="text-block-102">X</div></form></li><li class="list-item lang"><div class="w-locales-list"><div data-hover="false" data-delay="0" class="w-dropdown"><div class="dropdown-toggle-2 w-dropdown-toggle"><div class="nav-link primary locale">en</div></div><nav class="dropdown-list-3 w-dropdown-list"><div role="list" class="locales-list-2 w-locales-items"><div role="listitem" class="locale-2 w-locales-item"><a hreflang="en" href="/404" aria-current="page" class="nav-link w--current">en</a></div><div role="listitem" class="locale-2 w-locales-item"><a hreflang="it" href="/it/404" class="nav-link">it</a></div><div role="listitem" class="locale-2 w-locales-item"><a hreflang="ja" href="/ja/404" class="nav-link">ja</a></div></div></nav></div></div></li></ul></div><div class="menu-wrapper"><div class="div-block-196"><div class="div-block-197"></div><div id="closeMenuBtn" class="menu-button-2 w-node-_34a11a76-476f-b16c-fae0-21b0a8704d05-a8704ce7"><img loading="lazy" src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/66a254d7681a763b258ed2ad_close-btn.png" alt="" class="menu-icon open"/></div><a href="/" class="link-block-11 w-inline-block"><img loading="lazy" src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/663b3bdde5209d710f321bf9_5c9a1bb2f7d06dba12d9a1e0_Logo_i-Mesh.png" alt="" class="image-92"/></a></div><nav class="navigation-3"><ul role="list" class="list-8 w-list-unstyled"><li class="list-item-6"><a href="/about" class="menu-nav-navlink">WHO WE ARE</a></li><li class="list-item-6"><a href="/whats-i-mesh" class="menu-nav-navlink">WHAT&#x27;S i-Mesh</a></li><li class="list-item-6"><a href="/products" class="menu-nav-navlink">PRODUCTS</a></li><li class="list-item-6"><a href="/projects" class="menu-nav-navlink">PROJECTS</a></li><li class="list-item-6"><a href="/case-studies" class="menu-nav-navlink">CASE STUDIES</a></li><li class="list-item-6"><a href="/softness-i-mesh-designing-the-city" class="menu-nav-navlink">Softness i-Mesh.<br/>Designing the city.</a></li><li class="list-item-6"><a href="/behind-the-mesh" class="menu-nav-navlink">BEHIND THE MESH</a></li><li class="list-item-6 hidden"><a href="/press" class="menu-nav-navlink">PRESS</a></li><li class="list-item-6"><a href="/contacts" class="menu-nav-navlink">CONTACTS</a></li></ul></nav></div></header><div class="utility-page-wrap"><div class="utility-page-content"><img src="https://cdn.prod.website-files.com/static/page-not-found.211a85e40c.svg" alt=""/><h2>Page Not Found</h2><div>The page you are looking for doesn&#x27;t exist or has been moved</div></div></div><footer class="footer"><div class="div-block-5"><h2 class="newsletter-title">Subscribe to our newsletter<br/>Receive news and events in advance</h2><div class="w-form"><form id="wf-form-newsletter-form-2" name="wf-form-newsletter-form-2" data-name="newsletter-form" method="get" class="form" data-wf-page-id="6661b8d344f252d8c9d3b4fe" data-wf-element-id="71a2d1b8-f4bd-2330-3ae5-4a5ed625d6c9"><div class="div-block-6"><input class="input-field w-input" maxlength="256" name="name" data-name="name" placeholder="Name" type="text" id="name-6" required=""/><input class="input-field w-input" maxlength="256" name="surname" data-name="surname" placeholder="Surname" type="text" id="surname-5" required=""/><input class="input-field w-input" maxlength="256" name="email" data-name="email" placeholder="Email" type="email" id="email-5" required=""/><select id="Country-6" name="Country" data-name="Country" required="" class="input-field select w-select"><option value="">Nation</option><option value="Afghanistan">Afghanistan</option><option value=" Albania"> Albania</option><option value=" Algeria"> Algeria</option><option value=" Andorra"> Andorra</option><option value=" Angola"> Angola</option><option value=" Anguilla"> Anguilla</option><option value=" Antartide"> Antartide</option><option value=" Antigua e Barbuda"> Antigua e Barbuda</option><option value=" Antille Olandesi"> Antille Olandesi</option><option value=" Arabia Saudita"> Arabia Saudita</option><option value=" Argentina"> Argentina</option><option value=" Armenia"> Armenia</option><option value=" Aruba"> Aruba</option><option value=" Australia"> Australia</option><option value=" Austria"> Austria</option><option value=" Azerbaijan"> Azerbaijan</option><option value=" Bahamas"> Bahamas</option><option value=" Bahrain"> Bahrain</option><option value=" Bangladesh"> Bangladesh</option><option value=" Barbados"> Barbados</option><option value=" Belgio"> Belgio</option><option value=" Belize"> Belize</option><option value=" Benin"> Benin</option><option value=" Bermuda"> Bermuda</option><option value=" Bielorussia"> Bielorussia</option><option value=" Bhutan"> Bhutan</option><option value=" Bolivia"> Bolivia</option><option value=" Bosnia Erzegovina"> Bosnia Erzegovina</option><option value=" Botswana"> Botswana</option><option value=" Brasile"> Brasile</option><option value=" Brunei Darussalam"> Brunei Darussalam</option><option value=" Bulgaria"> Bulgaria</option><option value=" Burkina Faso"> Burkina Faso</option><option value=" Burundi"> Burundi</option><option value=" Cambogia"> Cambogia</option><option value=" Camerun"> Camerun</option><option value=" Canada"> Canada</option><option value=" Capo Verde"> Capo Verde</option><option value=" Ciad"> Ciad</option><option value=" Cile"> Cile</option><option value=" Cina"> Cina</option><option value=" Cipro"> Cipro</option><option value=" Citta del Vaticano"> Citta del Vaticano</option><option value=" Colombia"> Colombia</option><option value=" Comore"> Comore</option><option value=" Corea del Nord"> Corea del Nord</option><option value=" Corea del Sud"> Corea del Sud</option><option value=" Costa Rica"> Costa Rica</option><option value=" Costa d&#x27;Avorio"> Costa d&#x27;Avorio</option><option value=" Croazia"> Croazia</option><option value=" Cuba"> Cuba</option><option value=" Danimarca"> Danimarca</option><option value=" Dominica"> Dominica</option><option value=" Ecuador"> Ecuador</option><option value=" Egitto"> Egitto</option><option value=" Eire"> Eire</option><option value=" El Salvador"> El Salvador</option><option value=" Emirati Arabi Uniti"> Emirati Arabi Uniti</option><option value=" Eritrea"> Eritrea</option><option value=" Estonia"> Estonia</option><option value=" Etiopia"> Etiopia</option><option value=" Federazione Russa"> Federazione Russa</option><option value=" Fiji"> Fiji</option><option value=" Filippine"> Filippine</option><option value=" Finlandia"> Finlandia</option><option value=" Francia"> Francia</option><option value=" Gabon"> Gabon</option><option value=" Gambia"> Gambia</option><option value=" Georgia"> Georgia</option><option value=" Germania"> Germania</option><option value=" Ghana"> Ghana</option><option value=" Giamaica"> Giamaica</option><option value=" Giappone"> Giappone</option><option value=" Gibilterra"> Gibilterra</option><option value=" Gibuti"> Gibuti</option><option value=" Giordania"> Giordania</option><option value=" Grecia"> Grecia</option><option value=" Grenada"> Grenada</option><option value=" Groenlandia"> Groenlandia</option><option value=" Guadalupa"> Guadalupa</option><option value=" Guam"> Guam</option><option value=" Guatemala"> Guatemala</option><option value=" Guinea"> Guinea</option><option value=" Guinea-Bissau"> Guinea-Bissau</option><option value=" Guinea Equatoriale"> Guinea Equatoriale</option><option value=" Guyana"> Guyana</option><option value=" Guyana Francese"> Guyana Francese</option><option value=" Haiti"> Haiti</option><option value=" Honduras"> Honduras</option><option value=" Hong Kong"> Hong Kong</option><option value=" India"> India</option><option value=" Indonesia"> Indonesia</option><option value=" Iran"> Iran</option><option value=" Iraq"> Iraq</option><option value=" Isola di Bouvet"> Isola di Bouvet</option><option value=" Isola di Natale"> Isola di Natale</option><option value=" Isola Heard e Isole McDonald"> Isola Heard e Isole McDonald</option><option value=" Isole Cayman"> Isole Cayman</option><option value=" Isole Cocos"> Isole Cocos</option><option value=" Isole Cook"> Isole Cook</option><option value=" Isole Falkland"> Isole Falkland</option><option value=" Isole Faroe"> Isole Faroe</option><option value=" Isole Marshall"> Isole Marshall</option><option value=" Isole Marianne Settentrionali"> Isole Marianne Settentrionali</option><option value=" Isole Minori degli Stati Uniti d&#x27;America"> Isole Minori degli Stati Uniti d&#x27;America</option><option value=" Isola Norfolk"> Isola Norfolk</option><option value=" Isole Solomon"> Isole Solomon</option><option value=" Isole Turks e Caicos"> Isole Turks e Caicos</option><option value=" Isole Vergini Americane"> Isole Vergini Americane</option><option value=" Isole Vergini Britanniche"> Isole Vergini Britanniche</option><option value=" Israele"> Israele</option><option value=" Islanda"> Islanda</option><option value=" Italia"> Italia</option><option value=" Kazakhistan"> Kazakhistan</option><option value=" Kenya"> Kenya</option><option value=" Kirghizistan"> Kirghizistan</option><option value=" Kiribati"> Kiribati</option><option value=" Kuwait"> Kuwait</option><option value=" Laos"> Laos</option><option value=" Lettonia"> Lettonia</option><option value=" Lesotho"> Lesotho</option><option value=" Libano"> Libano</option><option value=" Liberia"> Liberia</option><option value=" Libia"> Libia</option><option value=" Liechtenstein"> Liechtenstein</option><option value=" Lituania"> Lituania</option><option value=" Lussemburgo"> Lussemburgo</option><option value=" Macao"> Macao</option><option value=" Macedonia"> Macedonia</option><option value=" Madagascar"> Madagascar</option><option value=" Malawi"> Malawi</option><option value=" Maldive"> Maldive</option><option value=" Malesia"> Malesia</option><option value=" Mali"> Mali</option><option value=" Malta"> Malta</option><option value=" Marocco"> Marocco</option><option value=" Martinica"> Martinica</option><option value=" Mauritania"> Mauritania</option><option value=" Maurizius"> Maurizius</option><option value=" Mayotte"> Mayotte</option><option value=" Messico"> Messico</option><option value=" Moldavia"> Moldavia</option><option value=" Monaco"> Monaco</option><option value=" Mongolia"> Mongolia</option><option value=" Montserrat"> Montserrat</option><option value=" Mozambico"> Mozambico</option><option value=" Myanmar"> Myanmar</option><option value=" Namibia"> Namibia</option><option value=" Nauru"> Nauru</option><option value=" Nepal"> Nepal</option><option value=" Nicaragua"> Nicaragua</option><option value=" Niger"> Niger</option><option value=" Nigeria"> Nigeria</option><option value=" Niue"> Niue</option><option value=" Norvegia"> Norvegia</option><option value=" Nuova Caledonia"> Nuova Caledonia</option><option value=" Nuova Zelanda"> Nuova Zelanda</option><option value=" Oman"> Oman</option><option value=" Paesi Bassi"> Paesi Bassi</option><option value=" Pakistan"> Pakistan</option><option value=" Palau"> Palau</option><option value=" Panama"> Panama</option><option value=" Papua Nuova Guinea"> Papua Nuova Guinea</option><option value=" Paraguay"> Paraguay</option><option value=" Peru"> Peru</option><option value=" Pitcairn"> Pitcairn</option><option value=" Polinesia Francese"> Polinesia Francese</option><option value=" Polonia"> Polonia</option><option value=" Portogallo"> Portogallo</option><option value=" Porto Rico"> Porto Rico</option><option value=" Qatar"> Qatar</option><option value=" Regno Unito"> Regno Unito</option><option value=" Repubblica Ceca"> Repubblica Ceca</option><option value=" Repubblica Centroafricana"> Repubblica Centroafricana</option><option value=" Repubblica del Congo"> Repubblica del Congo</option><option value=" Repubblica Democratica del Congo"> Repubblica Democratica del Congo</option><option value=" Repubblica Dominicana"> Repubblica Dominicana</option><option value=" Reunion"> Reunion</option><option value=" Romania"> Romania</option><option value=" Ruanda"> Ruanda</option><option value=" Sahara Occidentale"> Sahara Occidentale</option><option value=" Saint Kitts e Nevis"> Saint Kitts e Nevis</option><option value=" Saint Pierre e Miquelon"> Saint Pierre e Miquelon</option><option value=" Saint Vincent e Grenadine"> Saint Vincent e Grenadine</option><option value=" Samoa"> Samoa</option><option value=" Samoa Americane"> Samoa Americane</option><option value=" San Marino"> San Marino</option><option value=" Sant&#x27;Elena"> Sant&#x27;Elena</option><option value=" Santa Lucia"> Santa Lucia</option><option value=" Sao Tome e Principe"> Sao Tome e Principe</option><option value=" Senegal"> Senegal</option><option value=" Kosovo"> Kosovo</option><option value=" Seychelles"> Seychelles</option><option value=" Sierra Leone"> Sierra Leone</option><option value=" Singapore"> Singapore</option><option value=" Siria"> Siria</option><option value=" Slovacchia"> Slovacchia</option><option value=" Slovenia"> Slovenia</option><option value=" Somalia"> Somalia</option><option value=" Spagna"> Spagna</option><option value=" Sri Lanka"> Sri Lanka</option><option value=" Stati Federati della Micronesia"> Stati Federati della Micronesia</option><option value=" Stati Uniti d&#x27;America"> Stati Uniti d&#x27;America</option><option value=" Sud Africa"> Sud Africa</option><option value=" Sud Georgia e Isole Sandwich"> Sud Georgia e Isole Sandwich</option><option value=" Sudan"> Sudan</option><option value=" Suriname"> Suriname</option><option value=" Svalbard e Jan Mayen"> Svalbard e Jan Mayen</option><option value=" Svezia"> Svezia</option><option value=" Svizzera"> Svizzera</option><option value=" Swaziland"> Swaziland</option><option value=" Tagikistan"> Tagikistan</option><option value=" Tailandia"> Tailandia</option><option value=" Taiwan"> Taiwan</option><option value=" Tanzania"> Tanzania</option><option value=" Territori Britannici dell&#x27;Oceano Indiano"> Territori Britannici dell&#x27;Oceano Indiano</option><option value=" Territori Francesi del Sud"> Territori Francesi del Sud</option><option value=" Territori Palestinesi Occupati"> Territori Palestinesi Occupati</option><option value=" Timor Est"> Timor Est</option><option value=" Togo"> Togo</option><option value=" Tokelau"> Tokelau</option><option value=" Tonga"> Tonga</option><option value=" Trinidad e Tobago"> Trinidad e Tobago</option><option value=" Tunisia"> Tunisia</option><option value=" Turchia"> Turchia</option><option value=" Turkmenistan"> Turkmenistan</option><option value=" Tuvalu"> Tuvalu</option><option value=" Ucraina"> Ucraina</option><option value=" Uganda"> Uganda</option><option value=" Ungheria"> Ungheria</option><option value=" Uruguay"> Uruguay</option><option value=" Uzbekistan"> Uzbekistan</option><option value=" Vanuatu"> Vanuatu</option><option value=" Venezuela"> Venezuela</option><option value=" Vietnam"> Vietnam</option><option value=" Wallis e Futuna"> Wallis e Futuna</option><option value=" Yemen"> Yemen</option><option value=" Zambia"> Zambia</option><option value=" Zimbabwe"> Zimbabwe</option><option value=" Serbia"> Serbia</option><option value=" Montenegro"> Montenegro</option><option value=" Timor Est"> Timor Est</option><option value=" Guernsey"> Guernsey</option></select></div><label class="w-checkbox checkbox-wrapper margin-top margin-top-1re"><input type="checkbox" name="pricavy-checkbox" id="pricavy-checkbox" data-name="pricavy-checkbox" required="" class="w-checkbox-input checkbox"/><span class="checkbox-label-5 w-form-label" for="pricavy-checkbox">Subscribing you accept our <a href="/privacy-cookie-policy" class="link-13">privacy policy</a>.</span></label><input type="submit" data-wait="Please wait..." class="nav-link pills w-button" value="SUBSCRIBE"/></form><div class="w-form-done"><div>Thank you! Your submission has been received!</div></div><div class="w-form-fail"><div>Oops! Something went wrong while submitting the form.</div></div></div></div><div class="div-block-4"><div class="div-block-3"><ul role="list" class="list-2 first"><li><a data-position-button="box20" href="https://ARAZZICONTEMPORANEI.EU" target="_blank" class="nav-link pills w-button">ARAZZICONTEMPORANEI.EU</a></li><li class="mobile-hidden"><div class="text-block-89-copy">S. I. Srl Via Jesina, 60<br/>60022 Castelfidardo (An)<br/>email info@i-mesh.eu<br/>phone +39 07122163 <br/>fax +39 071 2210017</div></li></ul><ul role="list" class="list-2"><li><a href="/tender-funds" class="nav-link footer">Tender Funds</a></li><li><a href="/a-tailor-made-product" class="nav-link footer">Technology</a></li><li><a href="/transparency" class="nav-link footer">Transparency</a></li><li><a href="/archive" class="nav-link footer">Archive</a></li></ul><ul role="list" class="list-2"><li><a href="/sales-conditions" class="nav-link footer">Sales Conditions</a></li><li><a href="/quality-policy" class="nav-link footer">Quality policy</a></li></ul><ul role="list" class="list-2"><li><a href="https://www.instagram.com/imesh_official/" target="_blank" class="nav-link footer">Instagram</a></li><li><a href="https://www.linkedin.com/company/i-mesh/" target="_blank" class="nav-link footer">LinkedIn</a></li><li><a href="https://www.youtube.com/@i-Mesh_official" target="_blank" class="nav-link footer">Youtube</a></li><li><a href="https://it.pinterest.com/imesh_official/" target="_blank" class="nav-link footer">Pinterest</a></li></ul></div><div class="div-block-3-copy margin-top mobile-hidden"><div class="w-embed w-script"><p class="text-block-89-copy-2">&copy; 2019 - <script>document.write(new Date().getFullYear())</script> i-Mesh. All Rights Reserved.</p></div></div><div class="div-block-3 margin-top"><ul role="list" class="list-2"><li><a href="/privacy-cookie-policy" class="nav-link policy">Privacy &amp; Cookie Policy</a></li></ul><ul role="list" class="list-2"><li><div class="w-embed"><a href='#' class='iubenda-cs-preferences-link nav-link policy'>Cookies</a></div></li></ul><ul role="list" class="list-2"><li><a href="/legals" class="nav-link policy">Legals</a></li><li class="desktop-hidden"><div class="text-block-89 margin-top">S. I. Srl Via Jesina, <br/>60 60022 Castelfidardo (An)<br/>email info@i-mesh.eu<br/>phone +39 071 22163<br/>fax +39 071 2210017 </div></li><li class="desktop-hidden"><div class="w-embed w-script"><p class="text-block-89-copy-2">&copy; 2019 - <script>document.write(new Date().getFullYear())</script> i-Mesh. All Rights Reserved.</p></div></li></ul></div></div></footer><script src="https://d3e54v103j8qbb.cloudfront.net/js/jquery-3.5.1.min.dc5e7f18c8.js?site=663b32b87469cb70d54ecd88" type="text/javascript" integrity="sha256-9/aliU8dGd2tb6OSsuzixeV4y/faTqgFtohetphbbj0=" crossorigin="anonymous"></script><script src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/js/webflow.schunk.36b8fb49256177c8.js" type="text/javascript"></script><script src="https://cdn.prod.website-files.com/663b32b87469cb70d54ecd88/js/webflow.e4c9b1a1.4646699f13051f91.js" type="text/javascript"></script><script src="https://cdn.prod.website-files.com/gsap/3.14.2/gsap.min.js" type="text/javascript"></script><!--/////GLOBAL MENU//////-->
+	<script>
+  	const header = document.querySelector("header");
+      console.log("header!");
+    const menuWrapper = header.querySelector(".menu-wrapper");
+    const openMenuButton = header.querySelector("#openMenuBtn");
+    const closeMenuButton = header.querySelector("#closeMenuBtn");
+    
+    openMenuButton.addEventListener("click", function() {
+    	openMenu();
+    });
+    
+    closeMenuButton.addEventListener("click", function() {
+    	closeMenu();
+    });
+    
+    function openMenu() {
+    	header.setAttribute("menu-open", "");
+    	menuWrapper.setAttribute("open", "");
+      console.log("opening");
+    }
+    
+    function closeMenu() {
+    	header.removeAttribute("menu-open");
+    	menuWrapper.removeAttribute("open");
+      console.log("closing");
+    }
+    
+    
+    <!--GESTISCO TRASPARENZA HEADER CON SCROLL-->
+    $(window).on("scroll", function() {
+    if($(window).scrollTop() > 1) {
+        $("header").removeClass("transparent");
+    } else {
+        //remove the background property so it comes transparent again (defined in your css)
+       $("header").addClass("transparent");
+    }
+});
+
+<!--//////-->
+
+</script>
+
+<script>
+    ////POPUP NEWSLETTER
+    var popUpBlock = document.querySelector(".newsletter-container");
+    console.log("popUpBlock", popUpBlock);
+    var cookieName = 'popupNl-IMESH24-Closed';
+    
+    //set cookie popup
+    if(typeof Cookies.get(cookieName) != 'undefined'){
+        closePopUp();
+    } else {
+        //
+      //DA RAGIONARE POI COME FARE A FARLO SOLO IN HOME
+      setTimeout(openPopUp, 2500);
+    }
+    
+    $('.newsletter-close').on('click',function(){
+    closePopUp();
+    var inFifteenDays = new Date(new Date().getTime() + 1,296,000);
+    Cookies.set('popupNlClosed', 'true', {
+        expires: 15
+    });
+    });
+    
+    
+    
+    
+    
+    function closePopUp() {
+    
+    popUpBlock.classList.remove("open");
+    }
+    
+    function openPopUp() {
+      if (popUpBlock) {
+      popUpBlock.classList.add("open");
+      }
+    }
+    
+    </script>
+    
+    
+    
+    </body></html>

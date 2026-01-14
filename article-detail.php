@@ -1,4 +1,6 @@
 <?php 
+require_once 'config.php';
+require_once 'inc/url_helpers.php';
 include 'inc/header-new.php';
 require_once 'backend/inc/news_manager.php';
 
@@ -458,6 +460,17 @@ $relatedArticles = array_slice($relatedArticles, 0, 3);
     .related-grid {
         grid-template-columns: 1fr;
     }
+    
+    /* Force lists to display in 1 column on mobile */
+    .article-body ul,
+    .article-body ol,
+    .highlight-box ul,
+    .highlight-box ol {
+        columns: 1 !important;
+        column-count: 1 !important;
+        -webkit-columns: 1 !important;
+        -moz-columns: 1 !important;
+    }
 }
 
 @media (max-width: 480px) {
@@ -478,6 +491,23 @@ $relatedArticles = array_slice($relatedArticles, 0, 3);
     .article-footer {
         padding-left: 1rem;
         padding-right: 1rem;
+    }
+    
+    /* Ensure lists display in 1 column on small mobile */
+    .article-body ul,
+    .article-body ol,
+    .highlight-box ul,
+    .highlight-box ol {
+        columns: 1 !important;
+        column-count: 1 !important;
+        -webkit-columns: 1 !important;
+        -moz-columns: 1 !important;
+        padding-left: 1.5rem;
+    }
+    
+    .article-body li {
+        width: 100%;
+        display: block;
     }
 }
 </style>
@@ -718,7 +748,7 @@ $relatedArticles = array_slice($relatedArticles, 0, 3);
                     ];
                     $gradient = $gradients[$index % 3];
                     ?>
-                    <a href="article-detail.php?slug=<?php echo $related['slug']; ?>" class="related-card">
+                    <a href="<?php echo buildArticleUrl($related); ?>" class="related-card">
                         <div class="related-image" style="background: <?php echo $gradient; ?>;"></div>
                         <div class="related-content">
                             <div class="related-meta">

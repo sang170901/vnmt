@@ -1,9 +1,12 @@
 <?php
 header('Content-Type: text/html; charset=UTF-8');
 
+require_once 'config.php';
 require_once 'lang/lang.php';
 require_once 'lang/db_translate_helper.php';
 require_once 'inc/db_frontend.php';
+require_once 'inc/supplier_helpers.php';
+require_once 'inc/url_helpers.php';
 
 // Get supplier ID from URL
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -519,10 +522,14 @@ include __DIR__ . '/inc/header-new.php';
         <!-- Supplier Header -->
         <div class="supplier-header">
             <div class="supplier-header-content">
-                <?php if ($supplier['logo']): ?>
+                <?php 
+                $logoPath = getSupplierLogoPath($supplier['logo'] ?? null);
+                if ($logoPath): 
+                ?>
                 <div class="supplier-logo">
-                    <img src="<?php echo htmlspecialchars($supplier['logo']) ?>" 
-                         alt="<?php echo htmlspecialchars(getTranslatedName($supplier)) ?>">
+                    <img src="<?php echo htmlspecialchars($logoPath) ?>" 
+                         alt="<?php echo htmlspecialchars(getTranslatedName($supplier)) ?>"
+                         onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-building\' style=\'font-size: 4rem; color: #38bdf8; opacity: 0.5;\'></i>';">
                 </div>
                 <?php else: ?>
                 <div class="supplier-logo">
@@ -664,7 +671,7 @@ include __DIR__ . '/inc/header-new.php';
             <?php if (!empty($products)): ?>
             <div class="products-grid">
                 <?php foreach ($products as $product): ?>
-                <a href="product-detail.php?id=<?php echo $product['id'] ?>" class="product-card">
+                <a href="<?php echo buildProductUrl($product); ?>" class="product-card">
                     <?php if ($product['featured_image']): ?>
                         <img src="<?php echo htmlspecialchars($product['featured_image']) ?>" 
                              alt="<?php echo htmlspecialchars(getTranslatedName($product)) ?>" 

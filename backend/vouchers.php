@@ -16,22 +16,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $discount_value = (float)($_POST['discount_value'] ?? 0);
         $min_purchase = (float)($_POST['min_purchase'] ?? 0);
         $max_uses = (int)($_POST['max_uses'] ?? 0);
+        $supplier_id = !empty($_POST['supplier_id']) ? (int)$_POST['supplier_id'] : null;
         $start_date = trim($_POST['start_date'] ?? null);
         $end_date = trim($_POST['end_date'] ?? null);
         $status = isset($_POST['status']) ? 1 : 0;
 
         try {
             if ($id) {
-                $stmt = $pdo->prepare('UPDATE vouchers SET code=?, discount_type=?, discount_value=?, min_purchase=?, max_uses=?, start_date=?, end_date=?, status=? WHERE id=?');
-                $stmt->execute([$code, $discount_type, $discount_value, $min_purchase, $max_uses, $start_date, $end_date, $status, $id]);
+                $stmt = $pdo->prepare('UPDATE vouchers SET code=?, discount_type=?, discount_value=?, min_purchase=?, max_uses=?, supplier_id=?, start_date=?, end_date=?, status=? WHERE id=?');
+                $stmt->execute([$code, $discount_type, $discount_value, $min_purchase, $max_uses, $supplier_id, $start_date, $end_date, $status, $id]);
                 log_activity($_SESSION['user']['id'] ?? null, 'update_voucher', 'voucher', $id, json_encode(['code'=>$code]));
             } else {
-                $stmt = $pdo->prepare('INSERT INTO vouchers (code, discount_type, discount_value, min_purchase, max_uses, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-                $stmt->execute([$code, $discount_type, $discount_value, $min_purchase, $max_uses, $start_date, $end_date, $status]);
+                $stmt = $pdo->prepare('INSERT INTO vouchers (code, discount_type, discount_value, min_purchase, max_uses, supplier_id, start_date, end_date, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                $stmt->execute([$code, $discount_type, $discount_value, $min_purchase, $max_uses, $supplier_id, $start_date, $end_date, $status]);
                 $newId = $pdo->lastInsertId();
                 log_activity($_SESSION['user']['id'] ?? null, 'create_voucher', 'voucher', $newId, json_encode(['code'=>$code]));
             }
-            header('Location: vouchers.php?msg=' . urlencode('Saved') . '&t=success');
+            header('Location: vouchers.php?msg=' . urlencode('Lưu thành công') . '&t=success');
             exit;
         } catch (PDOException $e) {
             $flash['type'] = 'error';
@@ -46,7 +47,7 @@ if ($action === 'delete' && $id) {
         $stmt = $pdo->prepare('DELETE FROM vouchers WHERE id = ?');
         $stmt->execute([$id]);
         log_activity($_SESSION['user']['id'] ?? null, 'delete_voucher', 'voucher', $id, null);
-        header('Location: vouchers.php?msg=' . urlencode('Deleted') . '&t=success');
+        header('Location: vouchers.php?msg=' . urlencode('Đã xóa') . '&t=success');
         exit;
     } catch (PDOException $e) {
         $flash['type'] = 'error';
@@ -60,12 +61,31 @@ if ($action === 'toggle' && $id) {
         $stmt = $pdo->prepare('UPDATE vouchers SET status = 1 - status WHERE id = ?');
         $stmt->execute([$id]);
         log_activity($_SESSION['user']['id'] ?? null, 'toggle_voucher_status', 'voucher', $id, null);
-        header('Location: vouchers.php?msg=' . urlencode('Updated') . '&t=success');
+        header('Location: vouchers.php');
         exit;
     } catch (PDOException $e) {
         $flash['type'] = 'error';
         $flash['message'] = 'Không thể thay đổi trạng thái: ' . $e->getMessage();
     }
+}
+
+// Get voucher data for AJAX (JSON)
+if ($action === 'get' && $id) {
+    header('Content-Type: application/json');
+    try {
+        $stmt = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+        $stmt->execute([$id]);
+        $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($voucher) {
+            echo json_encode(['success' => true, 'voucher' => $voucher]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Không tìm thấy voucher']);
+        }
+    } catch (PDOException $e) {
+        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    }
+    exit;
 }
 
 require __DIR__ . '/inc/header.php';
@@ -75,15 +95,8 @@ $suppliers = $pdo->query('SELECT id,name FROM suppliers ORDER BY name')->fetchAl
 
 // Show flash from redirect
 if (isset($_GET['msg'])) {
-    $flash['message'] = urldecode($_GET['msg']);
+    $flash['message'] = $_GET['msg'];
     $flash['type'] = $_GET['t'] ?? 'success';
-}
-
-// Load voucher for edit
-if ($action === 'edit' && $id) {
-    $stmt = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
-    $stmt->execute([$id]);
-    $voucher = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 // Search
@@ -97,15 +110,14 @@ if (!empty($search)) {
     $vouchers = $pdo->query('SELECT * FROM vouchers ORDER BY id DESC')->fetchAll(PDO::FETCH_ASSOC);
 }
 
-// Translate flash messages
-$flash['message'] = $flash['message'] === 'Saved' ? 'Đã lưu thành công' : $flash['message'];
-$flash['message'] = $flash['message'] === 'Deleted' ? 'Đã xóa thành công' : $flash['message'];
-
 ?>
 <div class="card">
-    <h2 class="page-main-title">Quản lý voucher</h2>
+    <h2 class="page-main-title">Quản lý Voucher</h2>
+    
     <?php if (!empty($flash['message'])): ?>
-        <div class="flash <?php echo $flash['type'] === 'success' ? 'success' : 'error' ?>"><?php echo htmlspecialchars($flash['message']) ?></div>
+        <div class="flash <?php echo $flash['type'] === 'success' ? 'success' : 'error' ?>">
+            <?php echo htmlspecialchars($flash['message']) ?>
+        </div>
     <?php endif; ?>
 
     <?php
@@ -134,7 +146,7 @@ $flash['message'] = $flash['message'] === 'Deleted' ? 'Đã xóa thành công' :
     <?php endif; ?>
 
     <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
-        <a class="small-btn primary" href="vouchers.php?action=add">+ Thêm voucher</a>
+        <button class="small-btn primary" onclick="openAddModal()">+ Thêm voucher</button>
         <form method="get" action="vouchers.php" style="margin:0">
             <input type="text" name="q" placeholder="Tìm theo mã" value="<?php echo htmlspecialchars($search) ?>" style="padding:8px;border-radius:6px;border:1px solid #e6e9ef">
             <button class="small-btn" type="submit">Tìm</button>
@@ -158,94 +170,264 @@ $flash['message'] = $flash['message'] === 'Deleted' ? 'Đã xóa thành công' :
         <?php foreach ($vouchers as $v): ?>
             <tr>
                 <td><?php echo $v['id'] ?></td>
-                <td><?php echo htmlspecialchars($v['code']) ?></td>
-                <td><?php echo htmlspecialchars($v['discount_type']) ?></td>
+                <td><strong><?php echo htmlspecialchars($v['code']) ?></strong></td>
+                <td><?php echo $v['discount_type'] == 'percent' ? 'Phần trăm' : 'Cố định' ?></td>
                 <td><?php echo htmlspecialchars($v['discount_value']) ?></td>
                 <td><?php echo htmlspecialchars($v['min_purchase']) ?></td>
                 <td><?php
                     if (!empty($v['supplier_id'])) {
-                        $s = $pdo->prepare('SELECT name FROM suppliers WHERE id = ? LIMIT 1'); $s->execute([$v['supplier_id']]); $sr = $s->fetch(PDO::FETCH_ASSOC);
+                        $s = $pdo->prepare('SELECT name FROM suppliers WHERE id = ? LIMIT 1'); 
+                        $s->execute([$v['supplier_id']]); 
+                        $sr = $s->fetch(PDO::FETCH_ASSOC);
                         echo htmlspecialchars($sr['name'] ?? '');
-                    } else { echo '-'; }
+                    } else { 
+                        echo '<span style="color:#999;">-</span>'; 
+                    }
                 ?></td>
-                <td><?php echo ($v['status'] ?? 1) ? 'Hoạt động' : 'Không hoạt động' ?> <a class="small-btn" href="vouchers.php?action=toggle&id=<?php echo $v['id'] ?>">Bật/Tắt</a></td>
+                <td>
+                    <a href="vouchers.php?action=toggle&id=<?php echo $v['id'] ?>" style="text-decoration:none;">
+                        <?php echo ($v['status'] ?? 1) ? '<span style="color:green;font-weight:600;">✓ Hoạt động</span>' : '<span style="color:red;font-weight:600;">✗ Không hoạt động</span>' ?>
+                    </a>
+                </td>
                 <td class="btn-row">
-                    <a class="small-btn" href="vouchers.php?action=edit&id=<?php echo $v['id'] ?>">Sửa</a>
+                    <button class="small-btn" onclick="openEditModal(<?php echo $v['id'] ?>)">Sửa</button>
                     <a class="small-btn warn" href="vouchers.php?action=delete&id=<?php echo $v['id'] ?>" onclick="return confirm('Xóa voucher?')">Xóa</a>
                 </td>
             </tr>
         <?php endforeach; ?>
+        <?php if(empty($vouchers)): ?>
+            <tr>
+                <td colspan="8" style="text-align:center;color:#999;padding:40px;">
+                    Chưa có voucher nào. Nhấn "Thêm voucher" để bắt đầu.
+                </td>
+            </tr>
+        <?php endif; ?>
         </tbody>
     </table>
 </div>
 
-<?php if ($action === 'add' || $action === 'edit'): ?>
-<div class="card">
-    <h3 style="margin-top:0"><?php echo $action === 'edit' ? 'Sửa voucher' : 'Thêm voucher' ?></h3>
-    <?php if (!empty($flash['message']) && $flash['type'] === 'error'): ?>
-        <div class="flash error"><?php echo htmlspecialchars($flash['message']) ?></div>
-    <?php endif; ?>
-    <form method="post">
-        <div class="form-group">
-            <label for="code">Mã giảm giá</label>
-            <input type="text" name="code" id="code" placeholder="Nhập mã giảm giá" value="<?php echo isset($voucher['code']) ? htmlspecialchars($voucher['code']) : '' ?>">
+<!-- Modal Thêm Voucher -->
+<div id="addModal" class="modal">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <h3 style="margin:0">Thêm Voucher Mới</h3>
+            <span class="modal-close" onclick="closeAddModal()">&times;</span>
         </div>
+        <div class="modal-body">
+            <form method="post" id="addVoucherForm">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                    <div>
+                        <label>Mã giảm giá <span style="color:red">*</span>
+                            <input type="text" name="code" id="add_code" required style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Loại giảm giá
+                            <select name="discount_type" id="add_discount_type" style="width:100%">
+                                <option value="fixed">Cố định</option>
+                                <option value="percent">Theo phần trăm</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
 
-        <div class="form-group">
-            <label for="discount_type">Loại giảm giá</label>
-            <select name="discount_type" id="discount_type">
-                <option value="fixed" <?php echo (isset($voucher['discount_type']) && $voucher['discount_type']=='fixed') ? 'selected' : '' ?>>Cố định</option>
-                <option value="percent" <?php echo (isset($voucher['discount_type']) && $voucher['discount_type']=='percent') ? 'selected' : '' ?>>Theo phần trăm</option>
-            </select>
-        </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px">
+                    <div>
+                        <label>Giá trị giảm
+                            <input type="number" name="discount_value" id="add_discount_value" step="0.01" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Giá trị tối thiểu
+                            <input type="number" name="min_purchase" id="add_min_purchase" step="0.01" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Số lần tối đa
+                            <input type="number" name="max_uses" id="add_max_uses" style="width:100%">
+                        </label>
+                    </div>
+                </div>
 
-        <div class="form-group">
-            <label for="discount_value">Giá trị giảm</label>
-            <input type="number" name="discount_value" id="discount_value" placeholder="Nhập giá trị giảm" value="<?php echo isset($voucher['discount_value']) ? htmlspecialchars($voucher['discount_value']) : '' ?>">
-        </div>
+                <label style="margin-top:16px;">Nhà cung cấp (tuỳ chọn)
+                    <select name="supplier_id" id="add_supplier_id" style="width:100%">
+                        <option value="">-- Tất cả / Không --</option>
+                        <?php foreach ($suppliers as $s): ?>
+                            <option value="<?php echo $s['id'] ?>"><?php echo htmlspecialchars($s['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
 
-        <div class="form-group">
-            <label for="min_purchase">Giá trị tối thiểu</label>
-            <input type="number" name="min_purchase" id="min_purchase" placeholder="Nhập giá trị tối thiểu" value="<?php echo isset($voucher['min_purchase']) ? htmlspecialchars($voucher['min_purchase']) : '' ?>">
-        </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+                    <div>
+                        <label>Ngày bắt đầu
+                            <input type="date" name="start_date" id="add_start_date" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Ngày kết thúc
+                            <input type="date" name="end_date" id="add_end_date" style="width:100%">
+                        </label>
+                    </div>
+                </div>
 
-        <div class="form-group">
-            <label for="supplier_id">Nhà cung cấp (tuỳ chọn)</label>
-            <select name="supplier_id" id="supplier_id">
-                <option value="">-- Tất cả / Không --</option>
-                <?php foreach ($suppliers as $s): ?>
-                    <option value="<?php echo $s['id'] ?>" <?php echo (isset($voucher['supplier_id']) && $voucher['supplier_id'] == $s['id']) ? 'selected' : '' ?>><?php echo htmlspecialchars($s['name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
+                <label style="margin-top:16px;display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="status" id="add_status" checked>
+                    <span>Hoạt động</span>
+                </label>
 
-        <div class="form-group">
-            <label for="max_uses">Số lần tối đa</label>
-            <input type="number" name="max_uses" id="max_uses" value="<?php echo isset($voucher['max_uses']) ? htmlspecialchars($voucher['max_uses']) : '' ?>">
+                <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end">
+                    <button type="button" class="small-btn" onclick="closeAddModal()">Hủy</button>
+                    <button type="submit" class="small-btn primary" name="save_voucher">💾 Thêm voucher</button>
+                </div>
+            </form>
         </div>
-
-        <div class="form-group">
-            <label for="start_date">Ngày bắt đầu</label>
-            <input type="date" name="start_date" id="start_date" value="<?php echo isset($voucher['start_date']) ? htmlspecialchars($voucher['start_date']) : '' ?>">
-        </div>
-
-        <div class="form-group">
-            <label for="end_date">Ngày kết thúc</label>
-            <input type="date" name="end_date" id="end_date" value="<?php echo isset($voucher['end_date']) ? htmlspecialchars($voucher['end_date']) : '' ?>">
-        </div>
-
-        <div class="form-group">
-            <label>
-                <input type="checkbox" name="status" <?php echo (isset($voucher['status']) && $voucher['status']) ? 'checked' : '' ?>> Hoạt động
-            </label>
-        </div>
-
-        <div style="margin-top:12px">
-            <button class="primary" type="submit" name="save_voucher">Lưu</button>
-            <a class="small-btn" href="vouchers.php" style="margin-left:12px">Hủy</a>
-        </div>
-    </form>
+    </div>
 </div>
-<?php endif; ?>
+
+<!-- Modal Sửa Voucher -->
+<div id="editModal" class="modal">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <h3 style="margin:0">Chỉnh Sửa Voucher</h3>
+            <span class="modal-close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form method="post" id="editVoucherForm" action="vouchers.php?action=edit&id=">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                    <div>
+                        <label>Mã giảm giá <span style="color:red">*</span>
+                            <input type="text" name="code" id="edit_code" required style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Loại giảm giá
+                            <select name="discount_type" id="edit_discount_type" style="width:100%">
+                                <option value="fixed">Cố định</option>
+                                <option value="percent">Theo phần trăm</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:16px">
+                    <div>
+                        <label>Giá trị giảm
+                            <input type="number" name="discount_value" id="edit_discount_value" step="0.01" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Giá trị tối thiểu
+                            <input type="number" name="min_purchase" id="edit_min_purchase" step="0.01" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Số lần tối đa
+                            <input type="number" name="max_uses" id="edit_max_uses" style="width:100%">
+                        </label>
+                    </div>
+                </div>
+
+                <label style="margin-top:16px;">Nhà cung cấp (tuỳ chọn)
+                    <select name="supplier_id" id="edit_supplier_id" style="width:100%">
+                        <option value="">-- Tất cả / Không --</option>
+                        <?php foreach ($suppliers as $s): ?>
+                            <option value="<?php echo $s['id'] ?>"><?php echo htmlspecialchars($s['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+                    <div>
+                        <label>Ngày bắt đầu
+                            <input type="date" name="start_date" id="edit_start_date" style="width:100%">
+                        </label>
+                    </div>
+                    <div>
+                        <label>Ngày kết thúc
+                            <input type="date" name="end_date" id="edit_end_date" style="width:100%">
+                        </label>
+                    </div>
+                </div>
+
+                <label style="margin-top:16px;display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="status" id="edit_status">
+                    <span>Hoạt động</span>
+                </label>
+
+                <div style="margin-top:24px;display:flex;gap:12px;justify-content:flex-end">
+                    <button type="button" class="small-btn" onclick="closeEditModal()">Hủy</button>
+                    <button type="submit" class="small-btn primary" name="save_voucher">💾 Lưu thay đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('addVoucherForm').reset();
+    document.getElementById('add_status').checked = true;
+}
+
+function closeAddModal() {
+    document.getElementById('addModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+function openEditModal(voucherId) {
+    document.getElementById('editModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    document.getElementById('editVoucherForm').action = 'vouchers.php?action=edit&id=' + voucherId;
+    
+    fetch('vouchers.php?action=get&id=' + voucherId)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const v = data.voucher;
+                document.getElementById('edit_code').value = v.code || '';
+                document.getElementById('edit_discount_type').value = v.discount_type || 'fixed';
+                document.getElementById('edit_discount_value').value = v.discount_value || 0;
+                document.getElementById('edit_min_purchase').value = v.min_purchase || 0;
+                document.getElementById('edit_max_uses').value = v.max_uses || 0;
+                document.getElementById('edit_supplier_id').value = v.supplier_id || '';
+                document.getElementById('edit_start_date').value = v.start_date || '';
+                document.getElementById('edit_end_date').value = v.end_date || '';
+                document.getElementById('edit_status').checked = v.status == 1;
+            } else {
+                alert('Không thể tải thông tin voucher!');
+                closeEditModal();
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Lỗi khi tải dữ liệu!');
+            closeEditModal();
+        });
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+window.onclick = function(event) {
+    const addModal = document.getElementById('addModal');
+    const editModal = document.getElementById('editModal');
+    
+    if (event.target == addModal) closeAddModal();
+    if (event.target == editModal) closeEditModal();
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        closeAddModal();
+        closeEditModal();
+    }
+});
+</script>
 
 <?php require __DIR__ . '/inc/footer.php'; ?>

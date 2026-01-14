@@ -6,16 +6,16 @@
 
 /* CSS Variables */
 :root {
-    --primary-color: #48c9b0; /* Turquoise */
-    --secondary-color: #3498db; /* Light blue */
-    --accent-color: #f1c40f; /* Yellow accent */
-    --text-primary: #2c3e50; /* Dark blue for text */
-    --text-secondary: #34495e; /* Slightly lighter for secondary text */
+    --primary-color: #38bdf8; /* Sky 400 - pastel xanh nhạt */
+    --secondary-color: #22d3ee; /* Cyan 400 - accent pastel */
+    --accent-color: #7dd3fc; /* Sky 300 - nhạt hơn */
+    --text-primary: #1f2937; /* Gray 800 - dark text */
+    --text-secondary: #4b5563; /* Gray 600 - secondary text */
     --bg-primary: #ffffff; /* White background */
-    --bg-secondary: #f9f9f9; /* Light gray background */
-    --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.1);
+    --bg-secondary: #f0f9ff; /* Sky 50 - nền nhạt */
+    --shadow-lg: 0 10px 20px rgba(56, 189, 248, 0.15);
     --border-radius: 12px; /* Rounded corners */
-    --font-family: 'Roboto', sans-serif;
+    --font-family: 'Nunito Sans', 'Open Sans', 'Roboto', sans-serif;
 }
 
 /* Reset and Base Styles */
@@ -43,7 +43,7 @@ body {
 .header {
     text-align: center;
     padding: 20px;
-    background-color: var(--primary-color);
+    background: linear-gradient(135deg, #38bdf8 0%, #22d3ee 100%);
     color: #fff;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-lg);
@@ -75,7 +75,7 @@ body {
 
 .card h2 {
     font-size: 1.8rem;
-    color: var(--secondary-color);
+    color: var(--primary-color);
     margin-bottom: 10px;
 }
 
@@ -88,7 +88,7 @@ body {
 .footer {
     text-align: center;
     padding: 20px;
-    background-color: var(--secondary-color);
+    background: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%);
     color: #fff;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-lg);

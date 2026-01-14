@@ -68,12 +68,16 @@ function init_db(PDO $pdo, array $config){
     $pdo->exec("CREATE TABLE IF NOT EXISTS sliders (
         id INT AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(255),
-        image VARCHAR(255),
-        link VARCHAR(255),
-        start_date DATETIME,
-        end_date DATETIME,
+        subtitle VARCHAR(255),
+        description TEXT,
+        image VARCHAR(500),
+        link VARCHAR(500),
+        link_text VARCHAR(100),
+        start_date DATE,
+        end_date DATE,
         status TINYINT(1) DEFAULT 1,
-        display_order INT DEFAULT 0
+        display_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS scheduled_publishings (
@@ -95,6 +99,36 @@ function init_db(PDO $pdo, array $config){
         ip VARCHAR(45),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS partners (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        image_path VARCHAR(500),
+        status TINYINT(1) DEFAULT 1,
+        display_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) UNIQUE NOT NULL,
+        excerpt TEXT,
+        content LONGTEXT,
+        featured_image VARCHAR(500),
+        author_id INT DEFAULT NULL,
+        category VARCHAR(100),
+        tags VARCHAR(255),
+        status ENUM('draft', 'published', 'archived') DEFAULT 'draft',
+        views INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        published_at DATETIME DEFAULT NULL,
+        INDEX idx_status (status),
+        INDEX idx_category (category),
+        INDEX idx_created_at (created_at),
+        INDEX idx_slug (slug)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
     // Seed admin user - Use INSERT IGNORE for MySQL

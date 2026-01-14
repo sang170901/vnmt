@@ -6,13 +6,72 @@ Sau này có thể mở rộng thành hệ thống CMS hoàn chỉnh
 
 class NewsManager {
     
+    private $pdo;
+    
     // Constructor
     public function __construct() {
-        // Initialize if needed
+        require_once __DIR__ . '/db.php';
+        $this->pdo = getPDO();
     }
     
     // Instance method getNews()
     public function getNews($category = '', $search = '') {
+        // Try to get from database first
+        try {
+            $sql = "SELECT * FROM posts WHERE status = 'published'";
+            $params = [];
+            
+            // Filter by category
+            if (!empty($category)) {
+                $sql .= " AND category = ?";
+                $params[] = $category;
+            }
+            
+            // Filter by search
+            if (!empty($search)) {
+                $sql .= " AND (title LIKE ? OR excerpt LIKE ? OR content LIKE ?)";
+                $searchTerm = "%$search%";
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            $sql .= " ORDER BY created_at DESC";
+            
+            $stmt = $this->pdo->prepare($sql);
+            $stmt->execute($params);
+            $posts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // If we have posts from database, format and return them
+            if (!empty($posts)) {
+                return array_map(function($post) {
+                    return [
+                        'id' => $post['id'],
+                        'title' => $post['title'],
+                        'slug' => $post['slug'],
+                        'excerpt' => $post['excerpt'],
+                        'content' => $post['content'],
+                        'category' => $post['category'],
+                        'category_slug' => self::createSlug($post['category']),
+                        'author' => 'VNMaterial Team',
+                        'author_title' => 'Biên tập viên',
+                        'author_bio' => 'Đội ngũ chuyên gia',
+                        'featured_image' => $post['featured_image'] ?? 'assets/images/news/default.jpg',
+                        'tags' => !empty($post['tags']) ? explode(',', $post['tags']) : [],
+                        'published_date' => date('Y-m-d', strtotime($post['created_at'])),
+                        'reading_time' => ceil(str_word_count(strip_tags($post['content'])) / 200),
+                        'views' => $post['views'] ?? 0,
+                        'status' => $post['status'],
+                        'featured' => false
+                    ];
+                }, $posts);
+            }
+        } catch (Exception $e) {
+            // If database fails, fall back to sample news
+            error_log("NewsManager error: " . $e->getMessage());
+        }
+        
+        // Fallback to sample news if no database posts
         $news = self::getSampleNews();
         
         // Filter by category
@@ -35,7 +94,20 @@ class NewsManager {
     }
     
     // Static method getCategories()
-    public static function getCategories() {
+    public function getCategories() {
+        // Try to get from database first
+        try {
+            $stmt = $this->pdo->query("SELECT DISTINCT category FROM posts WHERE status = 'published' AND category IS NOT NULL AND category != '' ORDER BY category");
+            $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (!empty($categories)) {
+                return $categories;
+            }
+        } catch (Exception $e) {
+            error_log("NewsManager getCategories error: " . $e->getMessage());
+        }
+        
+        // Fallback to sample news
         $news = self::getSampleNews();
         $categories = array_unique(array_column($news, 'category'));
         return array_values($categories);

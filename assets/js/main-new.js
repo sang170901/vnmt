@@ -17,21 +17,22 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Function to go to specific slide
         function goToSlide(slideIndex) {
-            // Remove active class from current slide and dot
+            // Remove active class from current slide
             slides[currentSlide].classList.remove('active');
-            dots[currentSlide].classList.remove('active');
+            if (dots.length > 0 && dots[currentSlide]) {
+                dots[currentSlide].classList.remove('active');
+            }
             
             // Update current slide index
             currentSlide = slideIndex;
             
-            // Add active class to new slide and dot
+            // Add active class to new slide
             slides[currentSlide].classList.add('active');
-            dots[currentSlide].classList.add('active');
+            if (dots.length > 0 && dots[currentSlide]) {
+                dots[currentSlide].classList.add('active');
+            }
             
-            // Move slider
-            const sliderWrapper = document.querySelector('.slider-wrapper');
-            const translateX = -(currentSlide * (100 / totalSlides));
-            sliderWrapper.style.transform = `translateX(${translateX}%)`;
+            // Note: This slider uses CSS opacity/visibility transitions, not translateX
         }
         
         // Function to go to next slide
@@ -47,8 +48,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Arrow button event listeners
-        const nextArrow = document.querySelector('.next-arrow');
-        const prevArrow = document.querySelector('.prev-arrow');
+        const nextArrow = document.querySelector('.slider-next');
+        const prevArrow = document.querySelector('.slider-prev');
         
         if (nextArrow) {
             nextArrow.addEventListener('click', nextSlide);
@@ -57,6 +58,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (prevArrow) {
             prevArrow.addEventListener('click', prevSlide);
         }
+        
+        // Expose functions to global scope for inline onclick handlers
+        window.nextSlide = nextSlide;
+        window.prevSlide = prevSlide;
         
         // Dot navigation event listeners
         dots.forEach((dot, index) => {
@@ -69,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let autoPlayInterval;
         
         function startAutoPlay() {
-            autoPlayInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds
+            autoPlayInterval = setInterval(nextSlide, 3000); // Change slide every 3 seconds
         }
         
         function stopAutoPlay() {
