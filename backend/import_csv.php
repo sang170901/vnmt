@@ -195,7 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
         
         // Log activity
         if ($imported > 0) {
-            logActivity($_SESSION['user_id'] ?? null, 'import_csv_products', 'products', 0, json_encode(['count' => $imported]));
+            log_activity($_SESSION['user_id'] ?? null, 'import_csv_products', 'products', 0, json_encode(['count' => $imported]));
         }
         
     } catch (Exception $e) {
