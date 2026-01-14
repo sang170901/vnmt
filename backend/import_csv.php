@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                 
                 // Build data array from CSV row
                 $data = [];
-                foreach ($csv_columns as $col => $idx) {
+                foreach ($csv_columns as $idx => $col) {
                     if (isset($row[$idx])) {
                         $data[$col] = trim($row[$idx]);
                     }
